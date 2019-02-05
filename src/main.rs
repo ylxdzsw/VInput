@@ -1,3 +1,11 @@
+mod lib;
+
+use lib::shit;
+
 fn main() {
-    println!("Hello, world");
+    if let 3 = shit() {
+        print!("shit")
+    } else {
+        print!("fuck");;
+    }
 }
