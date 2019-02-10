@@ -1,7 +1,10 @@
 #![allow(dead_code, unused_imports)]
 
-mod models;
+mod sentence_models;
+mod word_models;
+mod context;
 
-pub fn shit() -> i32 {
+#[no_mangle]
+pub extern fn shit() -> i32 {
     return 3;
 }

@@ -1,10 +1,4 @@
-extern crate libvip;
-
-use libvip::shit;
-use std::env;
-use std::cell::RefCell;
-use std::thread;
-use std::time::Duration;
+use vip::shit;
 
 use std::sync::Mutex;
 
