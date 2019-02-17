@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_imports)]
+
 extern crate termion;
 
 use termion::cursor;
@@ -9,12 +11,12 @@ use vip::shit;
 use std::fs::File;
 use std::io::{Write, stdin, stderr};
 
-mod util;
+mod dict;
 
 fn main() {
     let f = File::open("data/test.txt").unwrap();
     let q: Vec<String> = util::load_list(f);
-    //let pos = stderr().cursor_pos().unwrap();
+
     let mut buf: Vec<char> = Vec::new();
     let mut stderr = stderr().into_raw_mode().unwrap();
 

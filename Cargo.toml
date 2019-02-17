@@ -9,3 +9,4 @@ crate-type = ["rlib", "cdylib"]
 
 [dependencies]
 termion = "1.5"
+memmap = "0.7"
