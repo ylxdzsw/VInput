@@ -59,33 +59,33 @@ impl<T: Clone + FromStr> Table<T> where <T as FromStr>::Err: std::fmt::Debug {
 // TODO: it might be better stored in a Trie tree
 pub struct Encoding {
     max_len: usize,
-    code: HashMap<Vec<u8>, Vec<u16>>,
+    map: HashMap<Vec<u8>, Vec<u16>>,
     id: Vec<char>
 }
 
 impl Encoding {
-    fn perfect_perfect(&self, x: &[char]) -> Vec<usize> {
-        self.map.get(x).map_or(Vec::new(), |x| x.clone())
-    }
+    // fn perfect_perfect(&self, x: &[char]) -> Vec<usize> {
+    //     self.code.get(x).map_or(Vec::new(), |x| x.clone())
+    // }
 
-    fn prefix_perfect(&self, x: &[char]) -> Vec<usize> {
-        (0..self.max_len).map(|i| self.perfect_perfect(&x[..=i])).flatten().collect()
-    }
+    // fn prefix_perfect(&self, x: &[char]) -> Vec<usize> {
+    //     (0..self.max_len).map(|i| self.perfect_perfect(&x[..=i])).flatten().collect()
+    // }
 
-    fn perfect_prefix(&self, _x: &[char]) -> Vec<usize> {
-        unimplemented!()
-    }
+    // fn perfect_prefix(&self, _x: &[char]) -> Vec<usize> {
+    //     unimplemented!()
+    // }
 }
 
-pub fn load_encoding<R: Read>(io: R) -> Encoding {
-    let mut enc = HashMap::new();
-    let mut max_len = 0;
-    for line in BufReader::new(io).lines().map(|x| x.unwrap()) {
-        let mut iter = line.split(' ');
-        let k: Vec<char> = iter.next().unwrap().chars().collect();
-        let v = iter.map(|x| x.parse().unwrap()).collect();
-        max_len = cmp::max(max_len, k.len());
-        enc.insert(k, v);
-    }
-    Encoding { max_len, map: enc }
-}
+// pub fn load_encoding<R: Read>(io: R) -> Encoding {
+//     let mut enc = HashMap::new();
+//     let mut max_len = 0;
+//     for line in BufReader::new(io).lines().map(|x| x.unwrap()) {
+//         let mut iter = line.split(' ');
+//         let k: Vec<char> = iter.next().unwrap().chars().collect();
+//         let v = iter.map(|x| x.parse().unwrap()).collect();
+//         max_len = cmp::max(max_len, k.len());
+//         enc.insert(k, v);
+//     }
+//     Encoding { max_len, map: enc }
+// }
