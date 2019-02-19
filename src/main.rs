@@ -11,14 +11,13 @@ use vip::shit;
 use std::fs::File;
 use std::io::{Write, stdin, stderr};
 use memmap::MmapOptions;
-use std::slice;
 
 mod dict;
 
 fn main() {
     let f = File::open("data/skip4").unwrap();
     let q = unsafe{ MmapOptions::new().map(&f).unwrap() };
-    let q = unsafe{ slice::from_raw_parts(q.as_ptr() as *const f32, q.len() / 4) }; // will the lifetime be a problem?
+    let q = unsafe{ std::slice::from_raw_parts(q.as_ptr() as *const f32, q.len() / 4) }; // will the lifetime be a problem?
     let q: Vec<_> = q.iter().take(40).map(|x| format!("{}", x)).collect();
 
     let mut buf: Vec<char> = Vec::new();
