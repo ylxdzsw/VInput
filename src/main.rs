@@ -16,30 +16,40 @@ fn main() {
 
     let mut buf: Vec<u8> = Vec::new();
     let mut candidate: Vec<String> = vec![];
+    let mut page = 0;
     let mut stderr = stderr().into_raw_mode().unwrap();
+    let mut dirty = true;
 
     for c in stdin().keys() {
         match c.unwrap() {
             Key::Char(c) => match c {
-                'a'...'z' => { buf.push(c as u8); }
+                'a'...'z' => { buf.push(c as u8); dirty = true }
                 '1'...'9' | ' ' | '\n' => {
                     let i = if c == '\n' || c == ' ' {
                         1
                     } else {
                         c as usize - '0' as usize
                     };
-                    write!(stderr, "\r\n{}{}\r\n", clear::CurrentLine, candidate.get(i).cloned().unwrap_or_default()).unwrap();
+                    write!(stderr, "\r\n{}{}\r\n", clear::CurrentLine, candidate.get(i-1).cloned().unwrap_or_default()).unwrap();
                     buf.clear();
+                    dirty = true
                 }
                 _ => continue,
             }
-            Key::Backspace => { buf.pop(); },
+            Key::Backspace => { buf.pop(); dirty = true }
             Key::Ctrl('c') | Key::Ctrl('d') => break,
+            Key::PageUp => { if page > 0 { page -= 1 } }
+            Key::PageDown => { if 10 * page + 10 <= candidate.len() { page += 1 } }
             _ => continue,
         }
 
-        candidate = enc.prefix_perfect(&buf).into_iter().take(10).map(|x| enc.id[(x-1) as usize].to_string()).collect();
-        render(&mut stderr, &buf.iter().map(|x| *x as char).collect::<Vec<_>>(), &candidate)
+        if dirty {
+            candidate = enc.prefix_perfect(&buf).into_iter().map(|x| format!("{} {}", enc.id[(x-1) as usize], enc.freq[(x-1) as usize].exp())).collect();
+            page = 0;
+            dirty = false
+        }
+        let view = &candidate[10*page..std::cmp::min(candidate.len(), 10*page+10)];
+        render(&mut stderr, &buf.iter().map(|x| *x as char).collect::<Vec<_>>(), view)
     }
 }
 

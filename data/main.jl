@@ -55,7 +55,7 @@ t_id = parse_encoding(encoding)
 t_map = Dict(c=>i for (i, c) in enumerate(t_id))
 t_unigram, t_skips = emurate_corpus(t_map, corpus...)
 perm = sortperm(t_unigram[2:end], rev=true)
-unigram = t_unigram[perm[1:freq_threshold] .+ 1]
+unigram = t_unigram[perm .+ 1]
 t = 1 ++ (perm[1:freq_threshold] .+ 1)
 skips = map(x->x[t, t], t_skips)
 open("data/char_id", "w") do f
@@ -64,7 +64,7 @@ end
 open("data/pinyin", "w") do f
     for line in eachline(encoding)
         enc, cont = split(line, ' ')
-        println(f, enc, ' ', join(map(c->findfirst(x->x==c, t_id[perm]), collect(cont)), ' '))
+        println(f, replace(enc, 'ü' => 'v'), ' ', join(map(c->findfirst(x->x==c, t_id[perm]), collect(cont)), ' '))
     end
 end
 open("data/freq","w") do f
