@@ -69,7 +69,7 @@ open("data/pinyin", "w") do f
 end
 open("data/freq","w") do f
     u = unigram .+ 1 # laplace smoothing
-    write(f, 0f0, f32.(log.(u ./ sum(u))))
+    write(f, f32.(log.(u ./ sum(u))))
 end
 open("data/skip4", "w") do f
     # explicitly enforce row-major layout

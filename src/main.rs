@@ -11,7 +11,36 @@ use std::io::{Write, stdin, stderr};
 
 mod dict;
 
+enum Dest{ Terminal, Network(u16) }
+
+fn init_dest() -> Dest {
+    let x = std::env::args().skip(1).next();
+    if let Some(x) = x {
+        if x == "-" || x == "" {
+            Dest::Terminal
+        } else if let Ok(x) = x.parse() {
+            Dest::Network(x)
+        } else {
+            panic!()
+        }
+    } else {
+        Dest::Terminal
+    }
+}
+
+fn send(dest: &Dest, msg: &str) {
+    match dest {
+        Dest::Terminal => {
+            write!(stderr(), "\r\n{}{}\r\n", clear::CurrentLine, msg).unwrap();
+        }
+        Dest::Network(port) => {
+            std::net::UdpSocket::bind("0.0.0.0:0").unwrap().send_to(msg.as_bytes(), format!("127.0.0.1:{}", port)).unwrap();
+        }
+    }
+}
+
 fn main() {
+    let dest = init_dest();
     let enc = dict::Encoding::load("data/pinyin", "data/id", "data/freq").unwrap();
 
     let mut buf: Vec<u8> = Vec::new();
@@ -30,9 +59,11 @@ fn main() {
                     } else {
                         c as usize - '0' as usize
                     };
-                    write!(stderr, "\r\n{}{}\r\n", clear::CurrentLine, candidate.get(i-1).cloned().unwrap_or_default()).unwrap();
-                    buf.clear();
-                    dirty = true
+                    if let Some(x) = candidate.get(10 * page + i - 1) {
+                        send(&dest, x);
+                        buf.clear();
+                        dirty = true
+                    }
                 }
                 _ => continue,
             }
