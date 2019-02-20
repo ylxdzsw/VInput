@@ -1,7 +1,5 @@
 #![allow(dead_code, unused_imports)]
 
-extern crate termion;
-
 use termion::cursor;
 use termion::clear;
 use termion::raw::IntoRawMode;
@@ -10,30 +8,27 @@ use termion::input::TermRead;
 use vip::shit;
 use std::fs::File;
 use std::io::{Write, stdin, stderr};
-use memmap::MmapOptions;
 
 mod dict;
 
 fn main() {
-    let f = File::open("data/skip4").unwrap();
-    let q = unsafe{ MmapOptions::new().map(&f).unwrap() };
-    let q = unsafe{ std::slice::from_raw_parts(q.as_ptr() as *const f32, q.len() / 4) }; // will the lifetime be a problem?
-    let q: Vec<_> = q.iter().take(40).map(|x| format!("{}", x)).collect();
+    let enc = dict::Encoding::load("data/pinyin", "data/id", "data/freq").unwrap();
 
-    let mut buf: Vec<char> = Vec::new();
+    let mut buf: Vec<u8> = Vec::new();
+    let mut candidate: Vec<String> = vec![];
     let mut stderr = stderr().into_raw_mode().unwrap();
 
     for c in stdin().keys() {
         match c.unwrap() {
             Key::Char(c) => match c {
-                'a'...'z' => { buf.push(c); }
+                'a'...'z' => { buf.push(c as u8); }
                 '1'...'9' | ' ' | '\n' => {
                     let i = if c == '\n' || c == ' ' {
                         1
                     } else {
                         c as usize - '0' as usize
                     };
-                    write!(stderr, "\r\n{}{}\r\n", clear::CurrentLine, q[i]).unwrap();
+                    write!(stderr, "\r\n{}{}\r\n", clear::CurrentLine, candidate.get(i).cloned().unwrap_or_default()).unwrap();
                     buf.clear();
                 }
                 _ => continue,
@@ -43,7 +38,8 @@ fn main() {
             _ => continue,
         }
 
-        render(&mut stderr, &buf, &q[..10])
+        candidate = enc.prefix_perfect(&buf).into_iter().take(10).map(|x| enc.id[(x-1) as usize].to_string()).collect();
+        render(&mut stderr, &buf.iter().map(|x| *x as char).collect::<Vec<_>>(), &candidate)
     }
 }
 

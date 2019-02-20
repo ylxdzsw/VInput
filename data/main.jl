@@ -48,7 +48,7 @@ function emurate_corpus(id_map, files...)
     unigram, skips
 end
 
-encoding = "data/raw/pinyin.jl"
+encoding = "data/raw/pinyin.txt"
 corpus = ("data/raw/corpus_1", "data/raw/corpus_2", "data/raw/corpus_3")
 
 t_id = parse_encoding(encoding)
@@ -76,7 +76,7 @@ open("data/skip4", "w") do f
     for i in 1:length(1:1+freq_threshold)
         # laplace smoothing
         lines = map(x->x[i, :] .+ 1, skips)
-        lines = map(x->f32.(x ./ sum(x)), lines)
+        lines = map(x->f32.(log.(x ./ sum(x))), lines)
         for j in 1:length(1:1+freq_threshold)
             for k in 1:Nskip
                 write(f, f32(lines[k][j]))

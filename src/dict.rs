@@ -1,28 +1,33 @@
-use std::io::{BufRead, BufReader, Read};
+use std::io::{self, BufRead, BufReader, Read};
 use std::str::FromStr;
+use std::fs::File;
 use std::ops::{Index, IndexMut};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::cmp;
 
+const FREQ_THRESHOLD: usize = 4095;
+
 mod mmaped_array {
+    use std::marker::PhantomData;
     use std::fs::File;
     use memmap::Mmap;
 
     #[derive(Debug)]
     pub struct MmapedArray<T: Copy> {
         file: File, // Mmap is valid only when the original file object alive
-        data: memmap::Mmap
+        data: memmap::Mmap,
+        fuck: PhantomData<T>,
     }
 
     impl<T: Copy> MmapedArray<T> {
         pub fn new(file: &str) -> std::io::Result<MmapedArray<T>> {
             let file = File::open(file)?;
             let data = unsafe { Mmap::map(&file)? };
-            Ok(MmapedArray { file, data: data })
+            Ok(MmapedArray { file, data: data, fuck: PhantomData })
         }
     }
 
-    impl<T> std::ops::Deref for MmapedArray<T> {
+    impl<T: Copy> std::ops::Deref for MmapedArray<T> {
         type Target = [T];
 
         fn deref(&self) -> &[T] {
@@ -38,81 +43,86 @@ use mmaped_array::MmapedArray;
 #[derive(Debug)]
 #[allow(non_snake_case)]
 pub struct Skip4 {
-    N: usize,
-    data: MmapedArray<f32>
+    N: usize, // the array is N x N, where N is freq_threshold + 1
+    data: MmapedArray<[f32; 4]>
 }
 
 impl Skip4 {
-    fn load(N: usize, path: &str) -> Skip4 {
-        let data = MmapedArray::new(path).unwrap();
-        assert_eq!((N+1)*(N+1), data.len());
-        Skip4 { N, data }
+    #[allow(non_snake_case)]
+    pub fn load(path: &str) -> io::Result<Skip4> {
+        let N = FREQ_THRESHOLD + 1;
+        let data = MmapedArray::new(path)?;
+        assert_eq!(N*N, data.len());
+        Ok(Skip4{ N, data })
     }
 }
 
 impl Index<(usize, usize)> for Skip4 {
-    type Output = (f32, f32, f32, f32);
+    type Output = [f32; 4];
 
-    fn index(&self, (x, y): (usize, usize)) -> &f32 {
+    fn index(&self, (x, y): (usize, usize)) -> &[f32; 4] {
         &self.data[x * self.N + y]
     }
 }
 
-impl IndexMut<(usize, usize)> for Skip4 {
-    fn index_mut(&mut self, (x, y): (usize, usize)) -> &mut f32 {
-        &mut self.data[x * self.N + y]
-    }
-}
-
-// impl<T: Clone + FromStr> Skip4<T> where <T as FromStr>::Err: std::fmt::Debug {
-//     #[allow(non_snake_case)]
-//     fn new(x: T, N: usize) -> Skip4<T> {
-//         let data = vec![x; N*N].into_boxed_slice();
-//         Skip4{ N, data }
-//     }
-
-//     fn load<R: Read>(&mut self, io: R) {
-//         for line in BufReader::new(io).lines().map(|x| x.unwrap()) {
-//             let mut iter = line.split(' ');
-//             let x: usize = iter.next().unwrap().parse().unwrap();
-//             let y: usize = iter.next().unwrap().parse().unwrap();
-//             let v: T = iter.next().unwrap().parse().unwrap();
-//             assert_eq!(None, iter.next());
-//             self[(x, y)] = v;
-//         }
-//     }
-// }
-
 pub struct Encoding {
-    max_len: usize,
-    map: HashMap<Vec<u8>, Vec<u16>>, // TODO: it might be better stored in a Trie tree
-    id: Vec<char>,
-    freq: Vec<f32> // the rationale of include unigram to encoding is it is required to sort the perfect encoding matches: all language models only consider frequent chars and the most infrequent ones can only be input with the fallback perfect encoding
+    pub max_len: usize, // maximum encoding length
+    pub map: BTreeMap<Vec<u8>, Vec<u16>>, // TODO: it might be better stored in a Trie tree
+    pub id: Vec<char>,
+    pub freq: Vec<f32> // the rationale of include unigram to encoding is it is required to sort the perfect encoding matches: all language models only consider frequent chars and the most infrequent ones can only be input with the fallback perfect encoding
 }
 
 impl Encoding {
-    // pub fn load_encoding<R: Read>(io: R) -> Encoding {
-    //     let mut enc = HashMap::new();
-    //     let mut max_len = 0;
-    //     for line in BufReader::new(io).lines().map(|x| x.unwrap()) {
-    //         let mut iter = line.split(' ');
-    //         let k: Vec<char> = iter.next().unwrap().chars().collect();
-    //         let v = iter.map(|x| x.parse().unwrap()).collect();
-    //         max_len = cmp::max(max_len, k.len());
-    //         enc.insert(k, v);
-    //     }
-    //     Encoding { max_len, map: enc }
-    // }
+    pub fn load(map: &str, id: &str, freq: &str) -> io::Result<Encoding> {
+        let (max_len, map) = Self::load_map(map)?;
+        let id = Self::load_id(id)?;
+        let freq = Self::load_freq(freq)?;
+        Ok(Encoding{ max_len, map, id, freq })
+    }
 
-    // fn perfect_perfect(&self, x: &[char]) -> Vec<usize> {
-    //     self.code.get(x).map_or(Vec::new(), |x| x.clone())
-    // }
+    fn load_map(path: &str) -> io::Result<(usize, BTreeMap<Vec<u8>, Vec<u16>>)> {
+        let mut enc = BTreeMap::new();
+        let mut max_len = 0;
+        for line in BufReader::new(File::open(path)?).lines().map(|x| x.unwrap()) {
+            let mut iter = line.split(' ');
+            let k: Vec<_> = iter.next().unwrap().chars().map(|x| x as u8).collect();
+            let v = iter.map(|x| x.parse().unwrap()).collect();
+            max_len = cmp::max(max_len, k.len());
+            enc.insert(k, v);
+        }
+        Ok((max_len, enc))
+    }
 
-    // fn prefix_perfect(&self, x: &[char]) -> Vec<usize> {
-    //     (0..self.max_len).map(|i| self.perfect_perfect(&x[..=i])).flatten().collect()
-    // }
+    fn load_id(path: &str) -> io::Result<Vec<char>> {
+        Ok(BufReader::new(File::open(path)?).lines().map(|x| x.unwrap().chars().next().unwrap()).collect())
+    }
 
-    // fn perfect_prefix(&self, _x: &[char]) -> Vec<usize> {
-    //     unimplemented!()
-    // }
+    fn load_freq(path: &str) -> io::Result<Vec<f32>> {
+        Ok(MmapedArray::new(path)?.to_vec())
+    }
+
+    pub fn perfect_perfect(&self, x: &[u8]) -> Vec<u16> {
+        self.map.get(x).map_or(vec![], |x| x.clone())
+    }
+
+    pub fn prefix_perfect(&self, x: &[u8]) -> Vec<u16> {
+        if x.len() == 0 || x.len() > self.max_len { // TODO: is the logic for len=0 correct?
+            return vec![]
+        }
+
+        let mut up = x.to_vec();
+        *up.last_mut().unwrap() += 1;
+        sort_and_dedup(self.map.range(x.to_vec()..up).map(|(_k, v)| v.clone()).flatten().collect())
+    }
+
+    // perfect_prefix means self (the left argument) is perfect matching while x is prefix matching
+    pub fn perfect_prefix(&self, x: &[u8]) -> Vec<u16> {
+        sort_and_dedup((0..self.max_len).map(|i| self.perfect_perfect(&x[..=i])).flatten().collect())
+    }
+}
+
+fn sort_and_dedup<T: cmp::Ord>(mut x: Vec<T>) -> Vec<T> {
+    x.sort();
+    x.dedup();
+    x
 }
