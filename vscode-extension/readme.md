@@ -10,3 +10,4 @@ todo:
 - [ ] launch or focus an instance of libvip when activating
 - [ ] auto choose a port
 - [ ] detect tab change?
+- [ ] better deletion: calling delete command is the best, otherwise at least support delete a line

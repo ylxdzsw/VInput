@@ -76,17 +76,25 @@ fn main() {
         match c.unwrap() {
             Key::Char(c) => match c {
                 'a'...'z' => { buf.push(c as u8); dirty = true }
-                '1'...'9' | ' ' | '\n' => {
-                    let i = if c == '\n' || c == ' ' {
-                        1
-                    } else {
+                '1'...'9' | ' ' => {
+                    let i = if c == ' ' { 1 } else {
                         c as usize - '0' as usize
                     };
-                    if let Some(x) = candidate.get(10 * page + i - 1) {
+
+                    if buf.is_empty() {
+                        send_raw(&dest, c)
+                    } else if let Some(x) = candidate.get(10 * page + i - 1) {
                         send(&dest, x);
                         buf.clear();
                         dirty = true
                     }
+                }
+                '\n' => if buf.is_empty() {
+                        send_raw(&dest, c)
+                } else {
+                    send(&dest, &String::from_utf8_lossy(&buf));
+                    buf.clear();
+                    dirty = true;
                 }
                 _ => send_raw(&dest, c),
             }

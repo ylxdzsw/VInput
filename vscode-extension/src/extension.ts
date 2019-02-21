@@ -2,11 +2,6 @@ import * as vscode from 'vscode'
 import { TextEditor, TextEditorEdit } from 'vscode';
 import * as dgram from 'dgram';
 
-const insert = (editor: TextEditor, value: string) =>
-    editor.edit(builder => editor.selection.isEmpty
-        ? builder.insert(editor.selection.active, value)
-        : builder.replace(editor.selection, value))
-
 const vInput = {
     server: null,
     editor: null,
@@ -18,21 +13,37 @@ const vInput = {
         this.server.on('message', (msg, rinfo) => {
             if (msg[0] == 0) { // control
                 switch (msg[1]) {
-                    case 1: this.move(-1, 0); break
-                    case 2: this.move(0, 1); break
-                    case 3: this.move(1, 0); break
-                    case 4: this.move(0, -1); break
+                    case 1: vscode.commands.executeCommand('cursorUp'); break
+                    case 2: vscode.commands.executeCommand('cursorRight'); break
+                    case 3: vscode.commands.executeCommand('cursorDown'); break
+                    case 4: vscode.commands.executeCommand('cursorLeft'); break
+                    case 5: vscode.commands.executeCommand('deleteLeft'); break
+                    case 6: vscode.commands.executeCommand('deleteRight'); break
+                    case 7: vscode.commands.executeCommand('cursorHome'); break
+                    case 8: vscode.commands.executeCommand('cursorEnd'); break
                 }
             } else {
-                insert(this.editor, ''+msg)
+                this.insert(''+msg)
             }
         })
     },
 
-    move(x, y) {
-        const pos = this.editor.selection.active
-        const newpos = pos.with(pos.line + x, pos.character + y)
-        this.editor.selection = new vscode.Selection(newpos, newpos)
+    insert(value) {
+        this.editor.edit(builder => this.editor.selection.isEmpty
+            ? builder.insert(this.editor.selection.active, value)
+            : builder.replace(this.editor.selection, value))
+    },
+
+    delete(x) {
+        this.editor.edit(builder => {
+            if (!this.editor.selection.isEmpty) {
+                builder.delete(this.editor.selection)
+            } else {
+                const start = this.editor.selection.active
+                const end = start.translate(0, x)
+                builder.delete(new vscode.Range(start, end))
+            }
+        })
     }
 }
 
