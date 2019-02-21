@@ -2,7 +2,7 @@
     "name": "vinput",
     "displayName": "VInput",
     "description": "VSCode extension that integrates libvip.",
-    "version": "0.0.0",
+    "version": "0.1.0",
     "publisher": "ylxdzsw",
     "repository": "ylxdzsw/VInput",
     "engines": {

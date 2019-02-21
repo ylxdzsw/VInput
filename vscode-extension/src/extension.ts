@@ -8,6 +8,7 @@ const vInput = {
 
     listen() {
         this.editor = vscode.window.activeTextEditor || this.editor
+        if (this.server) return
         this.server = dgram.createSocket('udp4')
         this.server.bind(22335)
         this.server.on('message', (msg, rinfo) => {
@@ -32,18 +33,6 @@ const vInput = {
         this.editor.edit(builder => this.editor.selection.isEmpty
             ? builder.insert(this.editor.selection.active, value)
             : builder.replace(this.editor.selection, value))
-    },
-
-    delete(x) {
-        this.editor.edit(builder => {
-            if (!this.editor.selection.isEmpty) {
-                builder.delete(this.editor.selection)
-            } else {
-                const start = this.editor.selection.active
-                const end = start.translate(0, x)
-                builder.delete(new vscode.Range(start, end))
-            }
-        })
     }
 }
 
