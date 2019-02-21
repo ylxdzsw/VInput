@@ -1,7 +1,11 @@
-/target
-Cargo.lock
-**/*.rs.bk
+*.rs.bk
 .vscode
-/data/*
-!/data/main.jl
-!/data/readme.txt
+node_modules
+/libvip/target
+/libvip/data/*
+!/libvip/data/main.jl
+!/libvip/data/readme.txt
+vscode-extension/out
+*.vsix
+package-lock.json
+Cargo.lock
