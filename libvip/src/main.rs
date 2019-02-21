@@ -13,6 +13,12 @@ mod dict;
 
 enum Dest{ Terminal, Network(u16) }
 
+trait Ignore {
+    fn ignore(&self) {}
+}
+
+impl<T> Ignore for T {}
+
 fn init_dest() -> Dest {
     let x = std::env::args().skip(1).next();
     if let Some(x) = x {
@@ -30,12 +36,29 @@ fn init_dest() -> Dest {
 
 fn send(dest: &Dest, msg: &str) {
     match dest {
-        Dest::Terminal => {
-            write!(stderr(), "\r\n{}{}\r\n", clear::CurrentLine, msg).unwrap();
-        }
-        Dest::Network(port) => {
-            std::net::UdpSocket::bind("0.0.0.0:0").unwrap().send_to(msg.as_bytes(), format!("127.0.0.1:{}", port)).unwrap();
-        }
+        Dest::Terminal => write!(stderr(), "\r\n{}{}\r\n", clear::CurrentLine, msg).unwrap(),
+        Dest::Network(port) => std::net::UdpSocket::bind("0.0.0.0:0").unwrap().send_to(msg.as_bytes(), format!("127.0.0.1:{}", port)).ignore()
+    }
+}
+
+fn send_raw(dest: &Dest, c: char) {
+    match dest {
+        Dest::Terminal => (),
+        Dest::Network(_) => send(dest, &c.to_string())
+    }
+}
+
+// control contains two bytes: it starts with \0, then followed with
+// 1: up, 2: right, 3: down, 4: left, 5: backspace, 6: delete, 7: home, 8: end
+fn control(dest: &Dest, key: Key) {
+    let code: u8 = match key {
+        Key::Up => 1, Key::Right => 2, Key::Down => 3, Key::Left => 4,
+        Key::Backspace => 5, Key::Delete => 6, Key::Home => 7, Key::End => 8,
+        _ => unreachable!()
+    };
+    match dest {
+        Dest::Terminal => (),
+        Dest::Network(_) => send(dest, &format!("\0{}", code as char))
     }
 }
 
@@ -47,7 +70,7 @@ fn main() {
     let mut candidate: Vec<String> = vec![];
     let mut page = 0;
     let mut stderr = stderr().into_raw_mode().unwrap();
-    let mut dirty = true;
+    let mut dirty = true; // indicate if buf changed and should update the candidates
 
     for c in stdin().keys() {
         match c.unwrap() {
@@ -65,17 +88,24 @@ fn main() {
                         dirty = true
                     }
                 }
-                _ => continue,
+                _ => send_raw(&dest, c),
             }
-            Key::Backspace => { buf.pop(); dirty = true }
+            key @ Key::Backspace =>
+                if let Some(_) = buf.pop() {
+                    dirty = true
+                } else {
+                    control(&dest, key)
+                }
             Key::Ctrl('c') | Key::Ctrl('d') => break,
             Key::PageUp => { if page > 0 { page -= 1 } }
             Key::PageDown => { if 10 * page + 10 <= candidate.len() { page += 1 } }
+            Key::Esc => { buf.clear(); dirty = true }
+            key@Key::Up | key@Key::Right | key@Key::Down | key@Key::Left | key@Key::Home | key@Key::End | key@Key::Delete => control(&dest, key),
             _ => continue,
         }
 
         if dirty {
-            candidate = enc.prefix_perfect(&buf).into_iter().map(|x| format!("{} {}", enc.id[(x-1) as usize], enc.freq[(x-1) as usize].exp())).collect();
+            candidate = enc.prefix_perfect(&buf).into_iter().map(|x| enc.id[(x-1) as usize].to_string()).collect();
             page = 0;
             dirty = false
         }

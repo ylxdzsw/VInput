@@ -16,8 +16,23 @@ const vInput = {
         this.server = dgram.createSocket('udp4')
         this.server.bind(22335)
         this.server.on('message', (msg, rinfo) => {
-            insert(this.editor, ''+msg)
+            if (msg[0] == 0) { // control
+                switch (msg[1]) {
+                    case 1: this.move(-1, 0); break
+                    case 2: this.move(0, 1); break
+                    case 3: this.move(1, 0); break
+                    case 4: this.move(0, -1); break
+                }
+            } else {
+                insert(this.editor, ''+msg)
+            }
         })
+    },
+
+    move(x, y) {
+        const pos = this.editor.selection.active
+        const newpos = pos.with(pos.line + x, pos.character + y)
+        this.editor.selection = new vscode.Selection(newpos, newpos)
     }
 }
 
