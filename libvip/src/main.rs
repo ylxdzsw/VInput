@@ -5,7 +5,6 @@ use termion::clear;
 use termion::raw::IntoRawMode;
 use termion::event::Key;
 use termion::input::TermRead;
-use vip::shit;
 use std::fs::File;
 use std::io::{Write, stdin, stderr};
 
@@ -64,7 +63,7 @@ fn control(dest: &Dest, key: Key) {
 
 fn main() {
     let dest = init_dest();
-    let enc = dict::Encoding::load("data/pinyin", "data/id", "data/freq").unwrap();
+    let enc = dict::Encoding::load("data/pinyin", "data/char_id", "data/freq").unwrap();
 
     let mut buf: Vec<u8> = Vec::new();
     let mut candidate: Vec<String> = vec![];
@@ -90,7 +89,7 @@ fn main() {
                     }
                 }
                 '\n' => if buf.is_empty() {
-                        send_raw(&dest, c)
+                    send_raw(&dest, c)
                 } else {
                     send(&dest, &String::from_utf8_lossy(&buf));
                     buf.clear();
@@ -98,22 +97,21 @@ fn main() {
                 }
                 _ => send_raw(&dest, c),
             }
-            key @ Key::Backspace =>
-                if let Some(_) = buf.pop() {
-                    dirty = true
-                } else {
-                    control(&dest, key)
-                }
+            key @ Key::Backspace => if let Some(_) = buf.pop() {
+                dirty = true
+            } else {
+                control(&dest, key)
+            }
             Key::Ctrl('c') | Key::Ctrl('d') => break,
-            Key::PageUp => { if page > 0 { page -= 1 } }
-            Key::PageDown => { if 10 * page + 10 <= candidate.len() { page += 1 } }
+            Key::PageUp => if page > 0 { page -= 1 }
+            Key::PageDown => if 10 * page + 10 <= candidate.len() { page += 1 }
             Key::Esc => { buf.clear(); dirty = true }
             key@Key::Up | key@Key::Right | key@Key::Down | key@Key::Left | key@Key::Home | key@Key::End | key@Key::Delete => control(&dest, key),
             _ => continue,
         }
 
         if dirty {
-            candidate = enc.prefix_perfect(&buf).into_iter().map(|x| enc.id[(x-1) as usize].to_string()).collect();
+            candidate = enc.prefix_exact(&buf).into_iter().map(|x| enc.id[(x-1) as usize].to_string()).collect();
             page = 0;
             dirty = false
         }

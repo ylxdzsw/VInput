@@ -1,4 +1,6 @@
-//pub mod hmm;
+mod hmm;
+
+pub use hmm::HMM;
 
 pub trait SentenceModel {
     fn new<T: Iterator<Item = char>>(x: T) -> Self;

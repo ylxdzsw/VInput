@@ -1,9 +1,18 @@
-use super::VInputModel;
+use super::SentenceModel;
+use crate::dict;
 
-struct HMM {
+pub struct HMM {
 
 }
 
-impl VInputModel for HMM {
-
+impl SentenceModel for HMM {
+    fn new<T: Iterator<Item = char>>(x: T) -> Self {
+        unimplemented!()
+    }
+    fn append(&mut self, c: char) {
+        unimplemented!()
+    }
+    fn get_sentence(&self) -> Option<&str> {
+        unimplemented!()
+    }
 }

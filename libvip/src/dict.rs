@@ -31,7 +31,7 @@ mod mmaped_array {
         type Target = [T];
 
         fn deref(&self) -> &[T] {
-            unsafe { std::slice::from_raw_parts(self.data.as_ptr() as *const T, self.data.len() / std::mem::size_of::<T>() ) }
+            unsafe { std::slice::from_raw_parts(self.data.as_ptr() as *const T, self.data.len() / std::mem::size_of::<T>()) }
         }
     }
 }
@@ -69,7 +69,7 @@ pub struct Encoding {
     pub max_len: usize, // maximum encoding length
     pub map: BTreeMap<Vec<u8>, Vec<u16>>, // TODO: it might be better stored in a Trie tree
     pub id: Vec<char>,
-    pub freq: Vec<f32> // the rationale of include unigram to encoding is it is required to sort the perfect encoding matches: all language models only consider frequent chars and the most infrequent ones can only be input with the fallback perfect encoding
+    pub freq: Vec<f32> // the rationale of include unigram to encoding is it is required to sort the exact encoding matches: all language models only consider frequent chars and the most infrequent ones can only be input with the fallback exact encoding
 }
 
 impl Encoding {
@@ -101,11 +101,11 @@ impl Encoding {
         Ok(MmapedArray::new(path)?.to_vec())
     }
 
-    pub fn perfect_perfect(&self, x: &[u8]) -> Vec<u16> {
+    pub fn exact_exact(&self, x: &[u8]) -> Vec<u16> {
         self.map.get(x).map_or(vec![], |x| x.clone())
     }
 
-    pub fn prefix_perfect(&self, x: &[u8]) -> Vec<u16> {
+    pub fn prefix_exact(&self, x: &[u8]) -> Vec<u16> {
         if x.len() == 0 || x.len() > self.max_len { // TODO: is the logic for len=0 correct?
             return vec![]
         }
@@ -115,9 +115,9 @@ impl Encoding {
         sort_and_dedup(self.map.range(x.to_vec()..up).map(|(_k, v)| v.clone()).flatten().collect())
     }
 
-    // perfect_prefix means self (the left argument) is perfect matching while x is prefix matching
-    pub fn perfect_prefix(&self, x: &[u8]) -> Vec<u16> {
-        sort_and_dedup((0..self.max_len).map(|i| self.perfect_perfect(&x[..=i])).flatten().collect())
+    // exact_prefix means self (the left argument) is exact matching while x is prefix matching
+    pub fn exact_prefix(&self, x: &[u8]) -> Vec<u16> {
+        sort_and_dedup((0..self.max_len).map(|i| self.exact_exact(&x[..=i])).flatten().collect())
     }
 }
 
