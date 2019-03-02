@@ -7,8 +7,8 @@ use termion::event::Key;
 use termion::input::TermRead;
 use std::fs::File;
 use std::io::{Write, stdin, stderr};
-
-mod dict;
+use std::ffi::CStr;
+use vip;
 
 enum Dest{ Terminal, Network(u16) }
 
@@ -63,7 +63,7 @@ fn control(dest: &Dest, key: Key) {
 
 fn main() {
     let dest = init_dest();
-    let enc = dict::Encoding::load("data").unwrap();
+    let ctx = vip::init("data\0".as_ptr() as *mut i8);
 
     let mut buf: Vec<u8> = Vec::new();
     let mut candidate: Vec<String> = vec![];
@@ -75,9 +75,11 @@ fn main() {
         match c.unwrap() {
             Key::Char(c) => match c {
                 'a'...'z' => { buf.push(c as u8); dirty = true }
-                '1'...'9' | ' ' => {
-                    let i = if c == ' ' { 1 } else {
-                        c as usize - '0' as usize
+                '0'...'9' | ' ' => {
+                    let i = match c {
+                        ' ' => 1,
+                        '0' => 10,
+                        _ => c as usize - '0' as usize
                     };
 
                     if buf.is_empty() {
@@ -111,7 +113,20 @@ fn main() {
         }
 
         if dirty {
-            candidate = enc.prefix_exact(&buf).into_iter().map(|x| enc.id[(x-1) as usize].to_string()).collect();
+            let mut x = buf.clone();
+            x.push(0);
+            vip::set_input(ctx, x.as_ptr() as *const i8);
+            let ptr = vip::get_candidates(ctx);
+            let raw = unsafe { CStr::from_ptr(ptr).to_str().unwrap() };
+            candidate = raw.lines().map(|line| {
+                let mut parts = line.split(' ');
+                let _len: usize = parts.next().unwrap().parse().unwrap();
+                let content = parts.next().unwrap().to_owned();
+                content
+            }).collect();
+            vip::free_candidates(ptr);
+
+            // = enc.prefix_exact(&buf).into_iter().map(|x| enc.id[(x-1) as usize].to_string()).collect();
             page = 0;
             dirty = false
         }

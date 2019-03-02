@@ -13,8 +13,8 @@ type Context = context::Context<sentence_models::HMM, word_models::VKey>;
 
 /// creat a new VInput instance, returns a pointer to be used as the first argument of all other functions
 #[no_mangle]
-pub extern fn init(data: *mut c_char) -> *mut Context {
-    let data = unsafe { CString::from_raw(data) };
+pub extern fn init(data: *const c_char) -> *mut Context {
+    let data = unsafe { CStr::from_ptr(data) };
     Box::into_raw(Box::new(Context::new(data.to_str().unwrap())))
 }
 
@@ -63,5 +63,5 @@ pub extern fn set_input(ctx: *mut Context, input: *const c_char) {
 pub extern fn set_hist(ctx: *mut Context, hist: *const c_char) {
     let ctx = unsafe { &mut *ctx };
     let hist = unsafe { CStr::from_ptr(hist) };
-    ctx.set_input(hist.to_bytes())
+    ctx.set_hist(&hist.to_str().unwrap().chars().collect::<Vec<_>>())
 }
