@@ -13,8 +13,9 @@ type Context = context::Context<sentence_models::HMM, word_models::VKey>;
 
 /// creat a new VInput instance, returns a pointer to be used as the first argument of all other functions
 #[no_mangle]
-pub extern fn init() -> *mut Context {
-    Box::into_raw(Box::new(Context::new()))
+pub extern fn init(data: *mut c_char) -> *mut Context {
+    let data = unsafe { CString::from_raw(data) };
+    Box::into_raw(Box::new(Context::new(data.to_str().unwrap())))
 }
 
 /// destroy and deallowcate an VInput instance.

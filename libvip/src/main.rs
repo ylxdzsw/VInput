@@ -63,7 +63,7 @@ fn control(dest: &Dest, key: Key) {
 
 fn main() {
     let dest = init_dest();
-    let enc = dict::Encoding::load("data/pinyin", "data/char_id", "data/freq").unwrap();
+    let enc = dict::Encoding::load("data").unwrap();
 
     let mut buf: Vec<u8> = Vec::new();
     let mut candidate: Vec<String> = vec![];

@@ -49,9 +49,9 @@ pub struct Skip4 {
 
 impl Skip4 {
     #[allow(non_snake_case)]
-    pub fn load(path: &str) -> io::Result<Skip4> {
+    pub fn load(data: &str) -> io::Result<Skip4> {
         let N = FREQ_THRESHOLD + 1;
-        let data = MmapedArray::new(path)?;
+        let data = MmapedArray::new(&format!("{}/skip4", data))?;
         assert_eq!(N*N, data.len());
         Ok(Skip4{ N, data })
     }
@@ -69,15 +69,17 @@ pub struct Encoding {
     pub max_len: usize, // maximum encoding length
     pub map: BTreeMap<Vec<u8>, Vec<u16>>, // TODO: it might be better stored in a Trie tree
     pub id: Vec<char>,
-    pub freq: Vec<f32> // the rationale of include unigram to encoding is it is required to sort the exact encoding matches: all language models only consider frequent chars and the most infrequent ones can only be input with the fallback exact encoding
+    pub code: BTreeMap<char, u16>, // reverse dict for id
+    pub freq: Vec<f32>, // the rationale of include unigram to encoding is it is required to sort the exact encoding matches: all language models only consider frequent chars and the most infrequent ones can only be input with the fallback exact encoding
 }
 
 impl Encoding {
-    pub fn load(map: &str, id: &str, freq: &str) -> io::Result<Encoding> {
-        let (max_len, map) = Self::load_map(map)?;
-        let id = Self::load_id(id)?;
-        let freq = Self::load_freq(freq)?;
-        Ok(Encoding{ max_len, map, id, freq })
+    pub fn load(data: &str) -> io::Result<Encoding> {
+        let (max_len, map) = Self::load_map(&format!("{}/encoding", data))?;
+        let id = Self::load_id(&format!("{}/char_id", data))?;
+        let freq = Self::load_freq(&format!("{}/freq", data))?;
+        let code = id.iter().enumerate().map(|(i, x)| (*x, i as u16)).collect();
+        Ok(Encoding{ max_len, map, id, code, freq })
     }
 
     fn load_map(path: &str) -> io::Result<(usize, BTreeMap<Vec<u8>, Vec<u16>>)> {
