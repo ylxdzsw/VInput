@@ -117,9 +117,8 @@ impl Encoding {
         sort_and_dedup(self.map.range(x.to_vec()..up).map(|(_k, v)| v.clone()).flatten().collect())
     }
 
-    // exact_prefix means self (the left argument) is exact matching while x is prefix matching
-    pub fn exact_prefix(&self, x: &[u8]) -> Vec<u16> {
-        sort_and_dedup((0..self.max_len).map(|i| self.exact_exact(&x[..=i])).flatten().collect())
+    pub fn exact_prefix(&self, x: &[u8]) -> Vec<(usize, u16)> {
+        sort_and_dedup((0..self.max_len).map(|i| self.exact_exact(&x[..=i]).iter().map(|x| (i, *x)).collect::<Vec<_>>()).flatten().collect())
     }
 }
 

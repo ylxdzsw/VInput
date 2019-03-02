@@ -24,7 +24,7 @@ impl<SM: SentenceModel, WM: WordModel> Context<SM, WM> {
     }
 
     pub fn get_candidates(&mut self) -> Vec<(usize, String)> {
-        unimplemented!()
+        self.get_exact_matches()
     }
 
     pub fn set_input(&mut self, input: &[u8]) {
@@ -33,5 +33,11 @@ impl<SM: SentenceModel, WM: WordModel> Context<SM, WM> {
 
     pub fn set_hist(&mut self, hist: &[char]) {
         self.hist = hist.iter().map(|x| self.enc.code[x]).collect()
+    }
+
+    fn get_exact_matches(&self) -> Vec<(usize, String)> {
+        let mut matches = self.enc.exact_prefix(&self.input);
+        matches.sort_by(|(l1, x1), (l2, x2)| l1.cmp(l2).then(self.enc.freq[*x1 as usize].partial_cmp(&self.enc.freq[*x2 as usize]).unwrap()).reverse());
+        matches.iter().map(|(l, x)| (*l, self.enc.id[*x as usize].to_string())).collect()
     }
 }
