@@ -6,22 +6,23 @@ use crate::dict::{Encoding, Skip4};
 // TODO: prefer longer sequance
 
 #[derive(Clone)]
-pub struct HMM<'a, 'b> {
+pub struct HMM<'enc, 'd> {
     token: Vec<u8>, // only the last N tokens, N is the max_len of encoding
     state: Vec<State>, // only the "live" states
-    dict: &'a Skip4,
-    enc: &'b Encoding
+    len: usize, // current length
+    enc: &'enc Encoding,
+    dict: &'d Skip4,
 }
 
-impl<'a, 'b> SentenceModel<'a, 'b> for HMM<'a, 'b> {
+impl<'enc, 'd> SentenceModel<'enc, 'd> for HMM<'enc, 'd> {
     type Dict = Skip4;
     
     fn load(data: &str) -> Skip4 {
         Skip4::load(data).unwrap()
     }
 
-    fn new<T: Iterator<Item = char>>(x: T, dict: &'a Skip4, enc: &'b Encoding) -> Self {
-        let mut s = HMM { token: Vec::with_capacity(enc.max_len), state: vec![], dict, enc };
+    fn new<T: Iterator<Item = char>>(x: T, enc: &'enc Encoding, dict: &'d Skip4) -> Self {
+        let mut s = HMM { token: Vec::with_capacity(enc.max_len), len: 0, state: vec![], dict, enc };
         for c in x {
             s.append(c);
         }
@@ -30,8 +31,9 @@ impl<'a, 'b> SentenceModel<'a, 'b> for HMM<'a, 'b> {
     
     // each state either do not move, or move to the last char
     fn append(&mut self, c: char) {
-        unimplemented!()
+        unimplemented!();
         //self.token.remove(0)
+        self.len += 1;
     }
     
     fn get_sentence(&self) -> Option<&str> {

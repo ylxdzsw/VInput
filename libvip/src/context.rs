@@ -2,7 +2,7 @@ use crate::sentence_models::SentenceModel;
 use crate::word_models::WordModel;
 use crate::dict::Encoding;
 
-pub struct Context<'a,'b, SM: SentenceModel<'a, 'b>, WM: WordModel> {
+pub struct Context<'enc, 'sd, SM: SentenceModel<'enc, 'sd>, WM: WordModel> {
     fuck: std::marker::PhantomData<(SM, WM)>,
     input: Box<[u8]>,
     hist: Box<[u16]>,
@@ -11,7 +11,7 @@ pub struct Context<'a,'b, SM: SentenceModel<'a, 'b>, WM: WordModel> {
     wmdata: WM::Dict
 }
 
-impl<'a, 'b, SM: SentenceModel<'a, 'b>, WM: WordModel> Context<'a, 'b, SM, WM> {
+impl<'enc, 'sd, SM: SentenceModel<'enc, 'sd>, WM: WordModel> Context<'enc, 'sd, SM, WM> {
     pub fn new(data: &str) -> Self {
         Self {
             fuck: std::marker::PhantomData,
