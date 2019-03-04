@@ -121,8 +121,26 @@ fn p(d: &Skip4, x: u16, h1: u16, h2: u16, h3: u16, h4: u16) -> f32 {
     (0.6 * a1 + 0.2 * a2 + 0.1 * a3 + 0.1 * a4).ln()
 }
 
+// insert candidate into pool, for the same states, leave only the one with largest total_p
 fn insert_pool(pool: &mut Vec<Rc<State>>, candidate: Rc<State>) {
-    unimplemented!()
+    for i in 0..pool.len() {
+        let x = &pool[i];
+        if x.len == candidate.len && similar(x, &candidate, 3) {
+            if candidate.total_p > x.total_p {
+                pool[i] = candidate;
+            }
+            return
+        }
+    }
+    pool.push(candidate)
+}
+
+fn similar(a: &State, b: &State, c: u8) -> bool {
+    if a.id != b.id { return false };
+    if c == 0 { return true };
+    if a.parent.is_none() && b.parent.is_none() { return true };
+    if a.parent.is_none() != b.parent.is_none() { return false };
+    similar(&a.parent.as_ref().unwrap(), &b.parent.as_ref().unwrap(), c - 1)
 }
 
 fn trace_sequence(s: &State) -> Vec<u16> {
