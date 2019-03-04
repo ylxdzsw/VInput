@@ -26,7 +26,15 @@ impl<SM: SentenceModel, WM: WordModel> Context<SM, WM> {
     pub fn get_candidates(&mut self) -> Vec<(usize, String)> {
         // TODO: keep only the one consuming most tokens for each candidate
         let x = SM::new(self.input.iter().map(|x| *x), &self.enc, &self.smdata);
-        self.get_raw_matches()
+        let sentence = x.get_sentence(&self.enc, &self.smdata);
+        let mut all = if let Some(sentence) = sentence {
+            vec![(self.input.len(), sentence.iter().map(|x| self.enc.id[*x as usize - 1]).collect())]
+        } else {
+            vec![]
+        };
+
+        all.append(&mut self.get_raw_matches());
+        all
     }
 
     pub fn set_input(&mut self, input: &[u8]) {
@@ -40,6 +48,6 @@ impl<SM: SentenceModel, WM: WordModel> Context<SM, WM> {
     fn get_raw_matches(&self) -> Vec<(usize, String)> {
         let mut matches = self.enc.prefix_prefix(&self.input);
         matches.sort_by(|(l1, x1), (l2, x2)| l1.cmp(l2).then(self.enc.freq[*x1 as usize - 1].partial_cmp(&self.enc.freq[*x2 as usize - 1]).unwrap()).reverse());
-        matches.iter().map(|(l, x)| (*l, self.enc.id[*x as usize - 1].to_string())).collect()
+        matches.into_iter().map(|(l, x)| (l, self.enc.id[x as usize - 1].to_string())).collect()
     }
 }

@@ -38,8 +38,8 @@ impl SentenceModel for HMM {
         self.tokens.push(c);
 
         // 2. remove states that cannot reach last char
-        let cut = self.len as u16 - enc.max_len as u16;
-        self.states.retain(|s| s.total_len >= cut);
+        let cut = self.len as i32 - enc.max_len as i32;
+        self.states.retain(|s| s.total_len as i32 >= cut);
 
         // 3. derive new states from old ones such that the new states reach the last char
         let mut new_states = vec![];
@@ -53,7 +53,7 @@ impl SentenceModel for HMM {
 
         // 4. make states from void at the beginning
         if self.len <= enc.max_len as u16 { // first generation
-            for id in enc.prefix_exact(&self.tokens) {
+            for id in enc.prefix_exact(&self.tokens).into_iter().filter(|x| *x <= FREQ_THRESHOLD as u16) {
                 insert_pool(&mut self.states, Rc::new(State {
                     total_len: self.len as u16,
                     total_p: p(dict, id as u16, 0, 0, 0, 0),
@@ -104,11 +104,11 @@ fn branch(origin: &Rc<State>, d: &Skip4, enc: &Encoding, tokens: &[u8]) -> Vec<R
     let [h1, h2, h3, h4] = h;
 
     // TODO: give reward to prefix length
-    enc.prefix_exact(tokens).iter().map(|x| Rc::new(State {
+    enc.prefix_exact(tokens).into_iter().filter(|x| *x <= FREQ_THRESHOLD as u16).map(|x| Rc::new(State {
         total_len: origin.total_len + tokens.len() as u16,
-        total_p: origin.total_p + p(d, *x, h1, h2, h3, h4),
+        total_p: origin.total_p + p(d, x, h1, h2, h3, h4),
         len: tokens.len() as u16,
-        id: *x,
+        id: x,
         parent: Some(origin.clone())
     })).collect()
 }
