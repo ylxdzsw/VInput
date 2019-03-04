@@ -5,7 +5,7 @@ use std::ops::{Index, IndexMut};
 use std::collections::BTreeMap;
 use std::cmp;
 
-const FREQ_THRESHOLD: usize = 4095;
+pub const FREQ_THRESHOLD: usize = 4095;
 
 mod mmaped_array {
     use std::marker::PhantomData;
