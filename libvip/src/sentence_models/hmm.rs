@@ -6,33 +6,31 @@ use crate::dict::{Encoding, Skip4, FREQ_THRESHOLD};
 // TODO: prefer longer sequence
 
 #[derive(Clone)]
-pub struct HMM<'enc, 'd> {
+pub struct HMM {
     tokens: Vec<u8>, // only the last N tokens, N is the max_len of encoding
     states: Vec<Rc<State>>, // only the "live" states
     len: u16, // current length
-    enc: &'enc Encoding,
-    dict: &'d Skip4,
 }
 
-impl<'enc, 'd> SentenceModel<'enc, 'd> for HMM<'enc, 'd> {
+impl SentenceModel for HMM {
     type Dict = Skip4;
     
     fn load(path: &str) -> Skip4 {
         Skip4::load(path).unwrap()
     }
 
-    fn new<T: Iterator<Item = u8>>(x: T, enc: &'enc Encoding, dict: &'d Skip4) -> Self {
-        let mut s = HMM { tokens: Vec::with_capacity(enc.max_len), len: 0, states: vec![], dict, enc };
+    fn new<T: Iterator<Item = u8>>(x: T, enc: &Encoding, dict: &Skip4) -> Self {
+        let mut s = HMM { tokens: Vec::with_capacity(enc.max_len), len: 0, states: vec![] };
         for c in x {
-            s.append(c);
+            s.append(enc, dict, c);
         }
         s
     }
     
     // each state either do not move, or move to the last char
-    fn append(&mut self, c: u8) {
+    fn append(&mut self, enc: &Encoding, dict: &Skip4, c: u8) {
         // 1. rotate the token buffer
-        if self.tokens.len() == self.enc.max_len {
+        if self.tokens.len() == enc.max_len {
             self.tokens.remove(0);
         }
 
@@ -40,25 +38,25 @@ impl<'enc, 'd> SentenceModel<'enc, 'd> for HMM<'enc, 'd> {
         self.tokens.push(c);
 
         // 2. remove states that cannot reach last char
-        let cut = self.len as u16 - self.enc.max_len as u16;
+        let cut = self.len as u16 - enc.max_len as u16;
         self.states.retain(|s| s.total_len >= cut);
 
         // 3. derive new states from old ones such that the new states reach the last char
         let mut new_states = vec![];
         for state in &self.states {
             let len = self.len as usize - state.total_len as usize;
-            new_states.append(&mut branch(state, self.dict, self.enc, &self.tokens[self.tokens.len()-len..]))
+            new_states.append(&mut branch(state, dict, enc, &self.tokens[self.tokens.len()-len..]))
         }
         for candidate in new_states {
             insert_pool(&mut self.states, candidate)
         }
 
         // 4. make states from void at the beginning
-        if self.len <= self.enc.max_len as u16 { // first generation
-            for id in self.enc.prefix_exact(&self.tokens) {
+        if self.len <= enc.max_len as u16 { // first generation
+            for id in enc.prefix_exact(&self.tokens) {
                 insert_pool(&mut self.states, Rc::new(State {
                     total_len: self.len as u16,
-                    total_p: p(self.dict, id as u16, 0, 0, 0, 0),
+                    total_p: p(dict, id as u16, 0, 0, 0, 0),
                     len: self.len as u16,
                     id: id as u16,
                     parent: None
@@ -66,8 +64,8 @@ impl<'enc, 'd> SentenceModel<'enc, 'd> for HMM<'enc, 'd> {
             }
         }
     }
-    
-    fn get_sentence(&self) -> Option<Vec<u16>> {
+
+    fn get_sentence(&self, _enc: &Encoding, _dict: &Skip4) -> Option<Vec<u16>> {
         let mut best = None;
         for state in &self.states {
             if state.total_len == self.len {
