@@ -7,9 +7,9 @@ use crate::dict::{Encoding, Skip4, FREQ_THRESHOLD};
 
 #[derive(Clone)]
 pub struct HMM<'enc, 'd> {
-    token: Vec<u8>, // only the last N tokens, N is the max_len of encoding
-    state: Vec<Rc<State>>, // only the "live" states
-    len: usize, // current length
+    tokens: Vec<u8>, // only the last N tokens, N is the max_len of encoding
+    states: Vec<Rc<State>>, // only the "live" states
+    len: u16, // current length
     enc: &'enc Encoding,
     dict: &'d Skip4,
 }
@@ -22,7 +22,7 @@ impl<'enc, 'd> SentenceModel<'enc, 'd> for HMM<'enc, 'd> {
     }
 
     fn new<T: Iterator<Item = u8>>(x: T, enc: &'enc Encoding, dict: &'d Skip4) -> Self {
-        let mut s = HMM { token: Vec::with_capacity(enc.max_len), len: 0, state: vec![], dict, enc };
+        let mut s = HMM { tokens: Vec::with_capacity(enc.max_len), len: 0, states: vec![], dict, enc };
         for c in x {
             s.append(c);
         }
@@ -31,28 +31,32 @@ impl<'enc, 'd> SentenceModel<'enc, 'd> for HMM<'enc, 'd> {
     
     // each state either do not move, or move to the last char
     fn append(&mut self, c: u8) {
-        if !self.token.is_empty() {
-            self.token.remove(0);
+        // 1. rotate the token buffer
+        if self.tokens.len() == self.enc.max_len {
+            self.tokens.remove(0);
         }
 
         self.len += 1;
-        self.token.push(c);
+        self.tokens.push(c);
 
+        // 2. remove states that cannot reach last char
         let cut = self.len as u16 - self.enc.max_len as u16;
-        self.state.retain(|s| s.total_len >= cut);
+        self.states.retain(|s| s.total_len >= cut);
 
+        // 3. derive new states from old ones such that the new states reach the last char
         let mut new_states = vec![];
-        for state in &self.state {
-            let len = self.len - state.total_len as usize;
-            new_states.append(&mut branch(state, self.dict, self.enc, &self.token[self.token.len()-len..]))
+        for state in &self.states {
+            let len = self.len as usize - state.total_len as usize;
+            new_states.append(&mut branch(state, self.dict, self.enc, &self.tokens[self.tokens.len()-len..]))
         }
         for candidate in new_states {
-            insert_pool(&mut self.state, candidate)
+            insert_pool(&mut self.states, candidate)
         }
 
-        if self.len <= self.enc.max_len { // first generation
-            for id in self.enc.prefix_exact(&self.token) {
-                insert_pool(&mut self.state, Rc::new(State {
+        // 4. make states from void at the beginning
+        if self.len <= self.enc.max_len as u16 { // first generation
+            for id in self.enc.prefix_exact(&self.tokens) {
+                insert_pool(&mut self.states, Rc::new(State {
                     total_len: self.len as u16,
                     total_p: p(self.dict, id as u16, 0, 0, 0, 0),
                     len: self.len as u16,
@@ -64,7 +68,17 @@ impl<'enc, 'd> SentenceModel<'enc, 'd> for HMM<'enc, 'd> {
     }
     
     fn get_sentence(&self) -> Option<Vec<u16>> {
-        unimplemented!()
+        let mut best = None;
+        for state in &self.states {
+            if state.total_len == self.len {
+                match &best {
+                    None => best = Some(state),
+                    Some(s) if s.total_p < state.total_p => best = Some(state),
+                    _ => ()
+                }
+            }
+        }
+        best.map(|x| trace_sequence(&x))
     }
 }
 
@@ -109,4 +123,14 @@ fn p(d: &Skip4, x: u16, h1: u16, h2: u16, h3: u16, h4: u16) -> f32 {
 
 fn insert_pool(pool: &mut Vec<Rc<State>>, candidate: Rc<State>) {
     unimplemented!()
+}
+
+fn trace_sequence(s: &State) -> Vec<u16> {
+    if let Some(p) = &s.parent {
+        let mut x = trace_sequence(p);
+        x.push(s.id);
+        x
+    } else {
+        vec![s.id]
+    }
 }
