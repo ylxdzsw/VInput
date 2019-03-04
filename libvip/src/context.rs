@@ -2,7 +2,7 @@ use crate::sentence_models::SentenceModel;
 use crate::word_models::WordModel;
 use crate::dict::Encoding;
 
-pub struct Context<SM: SentenceModel, WM: WordModel> {
+pub struct Context<'a,'b, SM: SentenceModel<'a, 'b>, WM: WordModel> {
     fuck: std::marker::PhantomData<(SM, WM)>,
     input: Box<[u8]>,
     hist: Box<[u16]>,
@@ -11,7 +11,7 @@ pub struct Context<SM: SentenceModel, WM: WordModel> {
     wmdata: WM::Dict
 }
 
-impl<SM: SentenceModel, WM: WordModel> Context<SM, WM> {
+impl<'a, 'b, SM: SentenceModel<'a, 'b>, WM: WordModel> Context<'a, 'b, SM, WM> {
     pub fn new(data: &str) -> Self {
         Self {
             fuck: std::marker::PhantomData,
@@ -24,6 +24,7 @@ impl<SM: SentenceModel, WM: WordModel> Context<SM, WM> {
     }
 
     pub fn get_candidates(&mut self) -> Vec<(usize, String)> {
+        // TODO: keep only the one consuming most tokens for each candidate
         self.get_raw_matches()
     }
 

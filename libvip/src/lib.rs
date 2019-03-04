@@ -9,11 +9,11 @@ use std::ffi::{CString, CStr};
 use std::os::raw::{c_char, c_int};
 use std::fmt::Write;
 
-type Context = context::Context<sentence_models::HMM, word_models::VKey>;
+type Context<'a, 'b> = context::Context<'a, 'b, sentence_models::HMM<'a, 'b>, word_models::VKey>;
 
 /// creat a new VInput instance, returns a pointer to be used as the first argument of all other functions
 #[no_mangle]
-pub extern fn init(data: *const c_char) -> *mut Context {
+pub extern fn init<'a, 'b>(data: *const c_char) -> *mut Context<'a, 'b> {
     let data = unsafe { CStr::from_ptr(data) };
     Box::into_raw(Box::new(Context::new(data.to_str().unwrap())))
 }

@@ -57,11 +57,11 @@ impl Skip4 {
     }
 }
 
-impl Index<(usize, usize)> for Skip4 {
+impl<T: Into<usize>> Index<(T, T)> for Skip4 {
     type Output = [f32; 4];
 
-    fn index(&self, (x, y): (usize, usize)) -> &[f32; 4] {
-        &self.data[x * self.N + y]
+    fn index(&self, (x, y): (T, T)) -> &[f32; 4] {
+        &self.data[x.into() * self.N + y.into()]
     }
 }
 
