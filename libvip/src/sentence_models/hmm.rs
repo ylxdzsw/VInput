@@ -8,7 +8,7 @@ use crate::dict::{Encoding, Skip4, FREQ_THRESHOLD};
 #[derive(Clone)]
 pub struct HMM {
     tokens: Vec<u8>, // only the last N tokens, N is the max_len of encoding
-    states: Vec<HashMap<[u16; 4], Rc<State>>>, // each map is a "generation", i.e., states that have the same .len
+    states: Vec<Vec<([u16; 4], Rc<State>)>>, // each element is a "generation", i.e., states that have the same .len
     len: u16, // current length
 }
 
@@ -71,6 +71,10 @@ impl SentenceModel for HMM {
             }
         }
 
+        let mut new_states: Vec<_> = new_states.into_iter().collect();
+        new_states.sort_by(|(_, x), (_, y)| x.total_p.partial_cmp(&y.total_p).unwrap().reverse());
+        new_states.truncate(32);
+
         // 4. rotate generations
         if self.states.len() == enc.max_len {
             self.states[0] = new_states;
@@ -82,7 +86,7 @@ impl SentenceModel for HMM {
 
     fn get_sentence(&self, _enc: &Encoding, _dict: &Skip4) -> Option<Vec<u16>> {
         let mut best = None;
-        for state in self.states.last()?.values() {
+        for (_, state) in self.states.last()? {
             match &best {
                 None => best = Some(state),
                 Some(s) if s.total_p < state.total_p => best = Some(state),
@@ -103,7 +107,7 @@ struct State {
 }
 
 fn p(d: &Skip4, x: u16, h: &[u16; 4]) -> f32 {
-    let (a1, a2, a3, a4) = (d[(h[0], x)][0].exp(), d[(h[1], x)][1].exp(), d[(h[2], x)][2].exp(), d[(h[3], x)][3].exp()); // Rust have no .map for arrays?
+    let (a1, a2, a3, a4) = (d[(h[3], x)][0].exp(), d[(h[2], x)][1].exp(), d[(h[1], x)][2].exp(), d[(h[0], x)][3].exp()); // Rust have no .map for arrays?
     // TODO: linear interpolation is bad. try something like softmax?
     (0.6 * a1 + 0.2 * a2 + 0.1 * a3 + 0.1 * a4).ln()
 }

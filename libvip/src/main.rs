@@ -75,7 +75,8 @@ fn main() {
     let mut stderr = stderr().into_raw_mode().unwrap();
     let mut dirty = true; // indicate if buf changed and should update the candidates
 
-    for c in "kaka1".chars().map(|x| Some(Key::Char(x))) { //stdin().keys() {
+    // for c in "kaka1".chars().map(|x| Some(Key::Char(x))) { //stdin().keys() {
+    for c in stdin().keys() {
         match c.unwrap() {
             Key::Char(c) => match c {
                 'a'...'z' => { buf.push(c as u8); dirty = true }
