@@ -33,6 +33,10 @@ fn init_dest() -> Dest {
     }
 }
 
+// fn get_tokens() -> Option<Vec<u8>> {
+//     Some(std::env::args().skip(2).next()?.into_bytes())
+// }
+
 fn send(dest: &Dest, msg: &str) {
     match dest {
         Dest::Terminal => write!(stderr(), "\r\n{}{}\r\n", clear::CurrentLine, msg).unwrap(),
@@ -71,7 +75,7 @@ fn main() {
     let mut stderr = stderr().into_raw_mode().unwrap();
     let mut dirty = true; // indicate if buf changed and should update the candidates
 
-    for c in stdin().keys() {
+    for c in "kaka1".chars().map(|x| Some(Key::Char(x))) { //stdin().keys() {
         match c.unwrap() {
             Key::Char(c) => match c {
                 'a'...'z' => { buf.push(c as u8); dirty = true }

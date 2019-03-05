@@ -2,11 +2,15 @@ use crate::sentence_models::SentenceModel;
 use crate::word_models::WordModel;
 use crate::dict::Encoding;
 
+const CHECKPOINT_STEP: usize = 3;
+
 pub struct Context<SM: SentenceModel, WM: WordModel> {
     fuck: std::marker::PhantomData<(SM, WM)>,
     input: Box<[u8]>,
     hist: Box<[u16]>,
     enc: Encoding,
+    sm: Option<SM>,
+    sms: Vec<SM>,
     smdata: SM::Dict,
     wmdata: WM::Dict
 }
@@ -18,6 +22,8 @@ impl<SM: SentenceModel, WM: WordModel> Context<SM, WM> {
             input: Box::new([]),
             hist: Box::new([]),
             enc: Encoding::load(data).unwrap(),
+            sm: None,
+            sms: vec![],
             smdata: SM::load(data),
             wmdata: WM::load(data)
         }
@@ -25,8 +31,7 @@ impl<SM: SentenceModel, WM: WordModel> Context<SM, WM> {
 
     pub fn get_candidates(&mut self) -> Vec<(usize, String)> {
         // TODO: keep only the one consuming most tokens for each candidate
-        let x = SM::new(self.input.iter().map(|x| *x), &self.enc, &self.smdata);
-        let sentence = x.get_sentence(&self.enc, &self.smdata);
+        let sentence = self.sm.as_ref().and_then(|x| x.get_sentence(&self.enc, &self.smdata));
         let mut all = if let Some(sentence) = sentence {
             vec![(self.input.len(), sentence.iter().map(|x| self.enc.id[*x as usize - 1]).collect())]
         } else {
@@ -38,6 +43,23 @@ impl<SM: SentenceModel, WM: WordModel> Context<SM, WM> {
     }
 
     pub fn set_input(&mut self, input: &[u8]) {
+        let mut i = 0;
+        while i < input.len() && i < self.input.len() && input[i] == self.input[i] {
+            i += 1;
+        }
+
+        self.sms.truncate(i / CHECKPOINT_STEP);
+
+        let mut sm = self.sms.last().map(|x| x.clone()).unwrap_or(SM::new(&self.enc, &self.smdata));
+
+        for i in self.sms.len()*CHECKPOINT_STEP..input.len() { // todo: perform updates in batch
+            sm.append(&self.enc, &self.smdata, input[i]);
+            if (i+1) % CHECKPOINT_STEP == 0 {
+                self.sms.push(sm.clone());
+            }
+        }
+
+        self.sm = Some(sm);
         self.input = Box::from(input);
     }
 

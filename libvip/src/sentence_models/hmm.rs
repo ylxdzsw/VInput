@@ -5,8 +5,6 @@ use std::cmp;
 use super::SentenceModel;
 use crate::dict::{Encoding, Skip4, FREQ_THRESHOLD};
 
-// TODO: prefer longer sequence
-
 #[derive(Clone)]
 pub struct HMM {
     tokens: Vec<u8>, // only the last N tokens, N is the max_len of encoding
@@ -16,17 +14,13 @@ pub struct HMM {
 
 impl SentenceModel for HMM {
     type Dict = Skip4;
-    
+
     fn load(path: &str) -> Skip4 {
         Skip4::load(path).unwrap()
     }
 
-    fn new<T: Iterator<Item = u8>>(x: T, enc: &Encoding, dict: &Skip4) -> Self {
-        let mut s = HMM { tokens: Vec::with_capacity(enc.max_len), len: 0, states: vec![] };
-        for c in x {
-            s.append(enc, dict, c);
-        }
-        s
+    fn new(enc: &Encoding, dict: &Skip4) -> Self {
+        HMM { tokens: Vec::with_capacity(enc.max_len), len: 0, states: vec![] }
     }
 
     // each state either do not move, or move to the last char
