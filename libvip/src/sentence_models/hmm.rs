@@ -1,4 +1,6 @@
 use std::rc::Rc;
+use std::collections::HashMap;
+use std::cmp;
 
 use super::SentenceModel;
 use crate::dict::{Encoding, Skip4, FREQ_THRESHOLD};
@@ -8,7 +10,7 @@ use crate::dict::{Encoding, Skip4, FREQ_THRESHOLD};
 #[derive(Clone)]
 pub struct HMM {
     tokens: Vec<u8>, // only the last N tokens, N is the max_len of encoding
-    states: Vec<Rc<State>>, // only the "live" states
+    states: Vec<HashMap<[u16; 4], Rc<State>>>, // each map is a "generation", i.e., states that have the same .len
     len: u16, // current length
 }
 
@@ -26,54 +28,71 @@ impl SentenceModel for HMM {
         }
         s
     }
-    
+
     // each state either do not move, or move to the last char
     fn append(&mut self, enc: &Encoding, dict: &Skip4, c: u8) {
-        // 1. rotate the token buffer
-        if self.tokens.len() == enc.max_len {
-            self.tokens.remove(0);
-        }
-
         self.len += 1;
-        self.tokens.push(c);
 
-        // 2. remove states that cannot reach last char
-        let cut = self.len as i32 - enc.max_len as i32;
-        self.states.retain(|s| s.total_len as i32 >= cut);
-
-        // 3. derive new states from old ones such that the new states reach the last char
-        let mut new_states = vec![];
-        for state in &self.states {
-            let len = self.len as usize - state.total_len as usize;
-            new_states.append(&mut branch(state, dict, enc, &self.tokens[self.tokens.len()-len..]))
-        }
-        for candidate in new_states {
-            insert_pool(&mut self.states, candidate)
+        // 1. rotate the buffers
+        if self.tokens.len() == enc.max_len {
+            self.tokens[0] = c;
+            self.tokens.rotate_left(1);
+        } else {
+            self.tokens.push(c);
         }
 
-        // 4. make states from void at the beginning
-        if self.len <= enc.max_len as u16 { // first generation
-            for id in enc.prefix_exact(&self.tokens).into_iter().filter(|x| *x <= FREQ_THRESHOLD as u16) {
-                insert_pool(&mut self.states, Rc::new(State {
-                    total_len: self.len as u16,
-                    total_p: p(dict, id as u16, 0, 0, 0, 0),
-                    len: self.len as u16,
-                    id: id as u16,
-                    parent: None
-                }))
+        // 2. generate a new generation
+        let mut new_states: HashMap<[u16; 4], Rc<State>> = HashMap::new();
+        for (i, gen) in self.states.iter().enumerate() {
+            let tlen = cmp::min(self.len as usize - 1, enc.max_len) - i;
+            let mut appendable = enc.prefix_exact(&self.tokens[self.tokens.len() - tlen..]);
+            appendable.retain(|x| *x <= FREQ_THRESHOLD as u16);
+            for (key, state) in gen {
+                for x in &appendable {
+                    let mut nk = key.clone();
+                    nk[0] = *x;
+                    nk.rotate_left(1);
+
+                    let ns = Rc::new(State {
+                        total_len: self.len,
+                        total_p: state.total_p + p(dict, *x, key),
+                        len: tlen as u16,
+                        id: *x,
+                        parent: Some(state.clone())
+                    });
+                    new_states.entry(nk).and_modify(|s| if ns.total_p > s.total_p { *s = ns.clone() }).or_insert(ns); // the unnecessary clone is because Rust think `ns` is moved twice
+                }
             }
+        }
+        if self.len <= enc.max_len as u16 { // first several generations
+            for id in enc.prefix_exact(&self.tokens).into_iter().filter(|x| *x <= FREQ_THRESHOLD as u16) {
+                let ns = Rc::new(State {
+                    total_len: self.len,
+                    total_p: p(dict, id, &[0,0,0,0]),
+                    len: self.len as u16,
+                    id: id,
+                    parent: None
+                });
+                new_states.entry([0,0,0,id]).and_modify(|s| if ns.total_p > s.total_p { *s = ns.clone() }).or_insert(ns);
+            }
+        }
+
+        // 4. rotate generations
+        if self.states.len() == enc.max_len {
+            self.states[0] = new_states;
+            self.states.rotate_left(1);
+        } else {
+            self.states.push(new_states);
         }
     }
 
     fn get_sentence(&self, _enc: &Encoding, _dict: &Skip4) -> Option<Vec<u16>> {
         let mut best = None;
-        for state in &self.states {
-            if state.total_len == self.len {
-                match &best {
-                    None => best = Some(state),
-                    Some(s) if s.total_p < state.total_p => best = Some(state),
-                    _ => ()
-                }
+        for state in self.states.last()?.values() {
+            match &best {
+                None => best = Some(state),
+                Some(s) if s.total_p < state.total_p => best = Some(state),
+                _ => ()
             }
         }
         best.map(|x| trace_sequence(&x))
@@ -89,32 +108,8 @@ struct State {
     parent: Option<Rc<State>> // None is treated as Root node; nodes with parent = None are the first generation
 }
 
-fn branch(origin: &Rc<State>, d: &Skip4, enc: &Encoding, tokens: &[u8]) -> Vec<Rc<State>> {
-    let mut h = [origin.id, 0, 0, 0];
-    let mut parent = &origin.parent;
-    for i in 0..3 {
-        if let Some(x) = parent {
-            h[i+1] = x.id;
-            parent = &x.parent;
-        } else {
-            break
-        }
-    }
-
-    let [h1, h2, h3, h4] = h;
-
-    // TODO: give reward to prefix length
-    enc.prefix_exact(tokens).into_iter().filter(|x| *x <= FREQ_THRESHOLD as u16).map(|x| Rc::new(State {
-        total_len: origin.total_len + tokens.len() as u16,
-        total_p: origin.total_p + p(d, x, h1, h2, h3, h4),
-        len: tokens.len() as u16,
-        id: x,
-        parent: Some(origin.clone())
-    })).collect()
-}
-
-fn p(d: &Skip4, x: u16, h1: u16, h2: u16, h3: u16, h4: u16) -> f32 {
-    let (a1, a2, a3, a4) = (d[(h1, x)][0].exp(), d[(h2, x)][1].exp(), d[(h3, x)][2].exp(), d[(h4, x)][3].exp());
+fn p(d: &Skip4, x: u16, h: &[u16; 4]) -> f32 {
+    let (a1, a2, a3, a4) = (d[(h[0], x)][0].exp(), d[(h[1], x)][1].exp(), d[(h[2], x)][2].exp(), d[(h[3], x)][3].exp()); // Rust have no .map for arrays?
     // TODO: linear interpolation is bad. try something like softmax?
     (0.6 * a1 + 0.2 * a2 + 0.1 * a3 + 0.1 * a4).ln()
 }
