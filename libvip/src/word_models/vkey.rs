@@ -10,13 +10,13 @@ impl WordModel for VKey {
     fn load(data: &str) -> Skip4 {
         Skip4::load(data).unwrap()
     }
-    fn new<T: Iterator<Item = char>>(x: T) -> Self {
+    fn new<T: Iterator<Item = char>>(_x: T) -> Self {
         unimplemented!()
     }
     fn get_words(&self) -> Vec<(i32, &str)> {
         unimplemented!()
     }
-    fn append(self, c: char) {
+    fn append(self, _c: char) {
         unimplemented!()
     }
 }

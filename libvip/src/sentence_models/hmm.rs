@@ -19,7 +19,7 @@ impl SentenceModel for HMM {
         Skip4::load(path).unwrap()
     }
 
-    fn new(enc: &Encoding, dict: &Skip4) -> Self {
+    fn new(enc: &Encoding, _dict: &Skip4) -> Self {
         HMM { tokens: Vec::with_capacity(enc.max_len), len: 0, states: vec![] }
     }
 
