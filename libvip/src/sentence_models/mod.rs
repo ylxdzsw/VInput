@@ -13,5 +13,6 @@ pub trait SentenceModel: Clone {
             self.append(enc, d, c)
         }
     }
+    fn set_history<T: Iterator<Item = u16>>(&mut self, _hist: T);
     fn get_sentence(&self, enc: &Encoding, d: &Self::Dict) -> Option<Vec<u16>>;
 }

@@ -9,14 +9,9 @@ use std::fs::File;
 use std::io::{Write, stdin, stderr};
 use std::ffi::CStr;
 use vip;
+use vip::utils::*;
 
 enum Dest{ Terminal, Network(u16) }
-
-trait Ignore {
-    fn ignore(&self) {}
-}
-
-impl<T> Ignore for T {}
 
 fn init_dest() -> Dest {
     let x = std::env::args().skip(1).next();
@@ -70,10 +65,11 @@ fn main() {
     let ctx = vip::init("data\0".as_ptr() as *mut i8);
 
     let mut buf: Vec<u8> = Vec::new();
-    let mut candidate: Vec<String> = vec![];
+    let mut candidate: Vec<(usize, String)> = vec![];
     let mut page = 0;
     let mut stderr = stderr().into_raw_mode().unwrap();
     let mut dirty = true; // indicate if buf changed and should update the candidates
+    let mut hist: Vec<u8> = vec![0];
 
     // for c in "kaka1".chars().map(|x| Some(Key::Char(x))) { //stdin().keys() {
     for c in stdin().keys() {
@@ -89,9 +85,11 @@ fn main() {
 
                     if buf.is_empty() {
                         send_raw(&dest, c)
-                    } else if let Some(x) = candidate.get(10 * page + i - 1) {
+                    } else if let Some((len, x)) = candidate.get(10 * page + i - 1) {
                         send(&dest, x);
-                        buf.clear();
+                        buf.drain(0..*len);
+                        append_hist(&mut hist, x.as_bytes());
+                        vip::set_hist(ctx, hist.as_ptr() as *const i8);
                         dirty = true
                     }
                 }
@@ -118,6 +116,11 @@ fn main() {
         }
 
         if dirty {
+            if buf.len() == 0 {
+                hist.clear();
+                hist.push(0);
+                vip::set_hist(ctx, hist.as_ptr() as *const i8);
+            }
             let mut x = buf.clone();
             x.push(0);
             vip::set_input(ctx, x.as_ptr() as *const i8);
@@ -125,9 +128,9 @@ fn main() {
             let raw = unsafe { CStr::from_ptr(ptr).to_str().unwrap() };
             candidate = raw.lines().map(|line| {
                 let mut parts = line.split(' ');
-                let _len: usize = parts.next().unwrap().parse().unwrap();
+                let len: usize = parts.next().unwrap().parse().unwrap();
                 let content = parts.next().unwrap().to_owned();
-                content
+                (len, content)
             }).collect();
             vip::free_candidates(ptr);
             page = 0;
@@ -138,15 +141,23 @@ fn main() {
     }
 }
 
-fn render(io: &mut Write, buf: &[char], menu: &[String]) {
+fn render(io: &mut Write, buf: &[char], menu: &[(usize, String)]) {
     // 1. clear and move cursor to the start
     write!(io, "\r{}", clear::AfterCursor).unwrap();
     // 2. render the input line
     write!(io, ">{}\r\n", buf.iter().collect::<String>()).unwrap();
     // 3. render the candidate list
-    for str in menu {
-        write!(io, "{}\r\n", str).unwrap();
+    for (_, s) in menu {
+        write!(io, "{}\r\n", s).unwrap();
     }
     // 4. move the cursor back
     write!(io, "{}\r{}", cursor::Up(1+menu.len() as u16), cursor::Right(1+buf.len() as u16)).unwrap();
+}
+
+fn append_hist(hist: &mut Vec<u8>, new: &[u8]) {
+    hist.pop();
+    for c in new {
+        hist.push(*c)
+    }
+    hist.push(0)
 }

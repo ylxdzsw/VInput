@@ -78,7 +78,7 @@ impl Encoding {
         let (max_len, map) = Self::load_map(&format!("{}/encoding", data))?;
         let id = Self::load_id(&format!("{}/char_id", data))?;
         let freq = Self::load_freq(&format!("{}/freq", data))?;
-        let code = id.iter().enumerate().map(|(i, x)| (*x, i as u16)).collect();
+        let code = id.iter().enumerate().map(|(i, x)| (*x, i as u16 + 1)).collect();
         Ok(Encoding{ max_len, map, id, code, freq })
     }
 
@@ -124,7 +124,7 @@ impl Encoding {
 
     pub fn prefix_prefix(&self, x: &[u8]) -> Vec<(usize, u16)> { // TODO: too many? performance?
         let len = cmp::min(x.len(), self.max_len);
-        sort_and_dedup((0..len).map(|i| self.prefix_exact(&x[..=i]).iter().map(|x| (i, *x)).collect::<Vec<_>>()).flatten().collect())
+        sort_and_dedup((0..len).map(|i| self.prefix_exact(&x[..=i]).iter().map(|x| (i+1, *x)).collect::<Vec<_>>()).flatten().collect())
     }
 }
 

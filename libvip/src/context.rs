@@ -1,6 +1,7 @@
 use crate::sentence_models::SentenceModel;
 use crate::word_models::WordModel;
 use crate::dict::Encoding;
+use crate::utils::*;
 
 const CHECKPOINT_STEP: usize = 3;
 
@@ -50,7 +51,7 @@ impl<SM: SentenceModel, WM: WordModel> Context<SM, WM> {
 
         self.sms.truncate(i / CHECKPOINT_STEP);
 
-        let mut sm = self.sms.last().map(|x| x.clone()).unwrap_or(SM::new(&self.enc, &self.smdata));
+        let mut sm = self.sms.last().map(|x| x.clone()).unwrap_or(SM::new(&self.enc, &self.smdata).apply_owned(|x| x.set_history(self.hist.iter().map(|x| *x))));
 
         for i in self.sms.len()*CHECKPOINT_STEP..input.len() { // todo: perform updates in batch
             sm.append(&self.enc, &self.smdata, input[i]);
@@ -64,7 +65,9 @@ impl<SM: SentenceModel, WM: WordModel> Context<SM, WM> {
     }
 
     pub fn set_hist(&mut self, hist: &[char]) {
-        self.hist = hist.iter().map(|x| self.enc.code[x]).collect()
+        self.hist = hist.iter().map(|x| self.enc.code[x]).collect();
+        self.sms.clear();
+        self.sm = None;
     }
 
     fn get_raw_matches(&self) -> Vec<(usize, String)> {

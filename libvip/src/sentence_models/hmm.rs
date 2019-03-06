@@ -4,6 +4,7 @@ use std::cmp;
 
 use super::SentenceModel;
 use crate::dict::{Encoding, Skip4, FREQ_THRESHOLD};
+use crate::utils::*;
 
 const KEEP_N_BEST: usize = 256;
 
@@ -11,6 +12,7 @@ const KEEP_N_BEST: usize = 256;
 pub struct HMM {
     tokens: Vec<u8>, // only the last N tokens, N is the max_len of encoding
     states: Vec<Vec<([u16; 4], Rc<State>)>>, // each element is a "generation", i.e., states that have the same .len
+    hist: [u16; 4],
     len: u16, // current length
 }
 
@@ -22,7 +24,7 @@ impl SentenceModel for HMM {
     }
 
     fn new(enc: &Encoding, _dict: &Skip4) -> Self {
-        HMM { tokens: Vec::with_capacity(enc.max_len), len: 0, states: vec![] }
+        HMM { tokens: Vec::with_capacity(enc.max_len), len: 0, hist: [0; 4], states: vec![] }
     }
 
     // each state either do not move, or move to the last char
@@ -64,12 +66,13 @@ impl SentenceModel for HMM {
             for id in enc.prefix_exact(&self.tokens).into_iter().filter(|x| *x <= FREQ_THRESHOLD as u16) {
                 let ns = Rc::new(State {
                     total_len: self.len,
-                    total_p: p(dict, id, &[0,0,0,0]),
+                    total_p: p(dict, id, &self.hist),
                     len: self.len as u16,
                     id: id,
                     parent: None
                 });
-                new_states.entry([0,0,0,id]).and_modify(|s| if ns.total_p > s.total_p { *s = ns.clone() }).or_insert(ns);
+                let key = [self.hist[1],self.hist[2],self.hist[3],id]; // does Rust has a good way to express that?
+                new_states.entry(key).and_modify(|s| if ns.total_p > s.total_p { *s = ns.clone() }).or_insert(ns);
             }
         }
 
@@ -84,6 +87,17 @@ impl SentenceModel for HMM {
         } else {
             self.states.push(new_states);
         }
+    }
+
+    fn set_history<T: Iterator<Item = u16>>(&mut self, hist: T) {
+        let hist: Vec<_> = hist.collect();
+        let n = hist.len();
+        let mut buf = [0; 4];
+        for i in 1..=4 {
+            if n < i { break }
+            buf[4-i] = hist[n-i];
+        }
+        self.hist = buf;
     }
 
     fn get_sentence(&self, _enc: &Encoding, _dict: &Skip4) -> Option<Vec<u16>> {
@@ -116,9 +130,7 @@ fn p(d: &Skip4, x: u16, h: &[u16; 4]) -> f32 {
 
 fn trace_sequence(s: &State) -> Vec<u16> {
     if let Some(p) = &s.parent {
-        let mut x = trace_sequence(p);
-        x.push(s.id);
-        x
+        trace_sequence(p).apply_owned(|x| x.push(s.id))
     } else {
         vec![s.id]
     }

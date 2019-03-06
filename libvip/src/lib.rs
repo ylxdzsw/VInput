@@ -5,6 +5,8 @@ mod word_models;
 mod context;
 mod dict;
 
+pub mod utils;
+
 use std::ffi::{CString, CStr};
 use std::os::raw::{c_char, c_int};
 use std::fmt::Write;
@@ -59,6 +61,7 @@ pub extern fn set_input(ctx: *mut Context, input: *const c_char) {
 /// set the history which is a \0 terminated UTF8 string contains characters before current cursor
 /// the history should only contain characters that is outputed by previours call to get_candidates
 /// setting history of unrecognized characters results in undefined behaviour (mostly segfault)
+/// setting history also clear the internal states. `set_input` must be called again at least once before `get_candidates`
 #[no_mangle]
 pub extern fn set_hist(ctx: *mut Context, hist: *const c_char) {
     let ctx = unsafe { &mut *ctx };
