@@ -31,7 +31,7 @@ function emurate_corpus(id_map, files...)
             id == 0 && push!(s, j)
         end
         push!(s, length(r)+1)
-        
+
         # second pass: collect N gram
         for j in 1:length(s)-1
             seg = map(x->id_map[x]+1, r[s[j]+1:s[j+1]-1])
@@ -49,7 +49,7 @@ function emurate_corpus(id_map, files...)
 end
 
 encoding = "data/raw/pinyin.txt"
-corpus = ("data/raw/corpus_1", "data/raw/corpus_2", "data/raw/corpus_3")
+corpus = ("data/raw/corpus_1", "data/raw/corpus_2", "data/raw/corpus_3", "data/raw/corpus_4")
 
 t_id = parse_encoding(encoding)
 t_map = Dict(c=>i for (i, c) in enumerate(t_id))
@@ -64,7 +64,7 @@ end
 open("data/pinyin", "w") do f
     for line in eachline(encoding)
         enc, cont = split(line, ' ')
-        println(f, replace(enc, 'ü' => 'v'), ' ', join(map(c->findfirst(x->x==c, t_id[perm]), collect(cont)), ' '))
+        println(f, enc, ' ', join(map(c->findfirst(x->x==c, t_id[perm]), collect(cont)), ' '))
     end
 end
 open("data/freq","w") do f

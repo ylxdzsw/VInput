@@ -130,8 +130,6 @@ fn main() {
                 content
             }).collect();
             vip::free_candidates(ptr);
-
-            // = enc.prefix_exact(&buf).into_iter().map(|x| enc.id[(x-1) as usize].to_string()).collect();
             page = 0;
             dirty = false
         }

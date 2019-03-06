@@ -5,6 +5,8 @@ use std::cmp;
 use super::SentenceModel;
 use crate::dict::{Encoding, Skip4, FREQ_THRESHOLD};
 
+const KEEP_N_BEST: usize = 256;
+
 #[derive(Clone)]
 pub struct HMM {
     tokens: Vec<u8>, // only the last N tokens, N is the max_len of encoding
@@ -73,9 +75,9 @@ impl SentenceModel for HMM {
 
         let mut new_states: Vec<_> = new_states.into_iter().collect();
         new_states.sort_by(|(_, x), (_, y)| x.total_p.partial_cmp(&y.total_p).unwrap().reverse());
-        new_states.truncate(32);
+        new_states.truncate(KEEP_N_BEST);
 
-        // 4. rotate generations
+        // 3. rotate generations
         if self.states.len() == enc.max_len {
             self.states[0] = new_states;
             self.states.rotate_left(1);
@@ -110,28 +112,6 @@ fn p(d: &Skip4, x: u16, h: &[u16; 4]) -> f32 {
     let (a1, a2, a3, a4) = (d[(h[3], x)][0].exp(), d[(h[2], x)][1].exp(), d[(h[1], x)][2].exp(), d[(h[0], x)][3].exp()); // Rust have no .map for arrays?
     // TODO: linear interpolation is bad. try something like softmax?
     (0.6 * a1 + 0.2 * a2 + 0.1 * a3 + 0.1 * a4).ln()
-}
-
-// insert candidate into pool, for the same states, leave only the one with largest total_p
-fn insert_pool(pool: &mut Vec<Rc<State>>, candidate: Rc<State>) {
-    for i in 0..pool.len() {
-        let x = &pool[i];
-        if x.len == candidate.len && similar(x, &candidate, 3) {
-            if candidate.total_p > x.total_p {
-                pool[i] = candidate;
-            }
-            return
-        }
-    }
-    pool.push(candidate)
-}
-
-fn similar(a: &State, b: &State, c: u8) -> bool {
-    if a.id != b.id { return false };
-    if c == 0 { return true };
-    if a.parent.is_none() && b.parent.is_none() { return true };
-    if a.parent.is_none() != b.parent.is_none() { return false };
-    similar(&a.parent.as_ref().unwrap(), &b.parent.as_ref().unwrap(), c - 1)
 }
 
 fn trace_sequence(s: &State) -> Vec<u16> {
