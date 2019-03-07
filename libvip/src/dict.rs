@@ -108,6 +108,7 @@ impl Encoding {
     }
 
     pub fn prefix_exact(&self, x: &[u8]) -> Vec<u16> {
+        // let x: Vec<_> = x.iter().map(|x| *x).filter(|x| *x != '\'' as u8).collect();
         if x.len() == 0 || x.len() > self.max_len { // TODO: is the logic for len=0 correct?
             return vec![]
         }

@@ -30,62 +30,20 @@ impl SentenceModel for HMM {
     // each state either do not move, or move to the last char
     fn append(&mut self, enc: &Encoding, dict: &Skip4, c: u8) {
         self.len += 1;
+        rotate_insert(&mut self.tokens, enc.max_len, c);
 
-        // 1. rotate the buffers
-        if self.tokens.len() == enc.max_len {
-            self.tokens[0] = c;
-            self.tokens.rotate_left(1);
-        } else {
-            self.tokens.push(c);
-        }
-
-        // 2. generate a new generation
-        let mut new_states: HashMap<[u16; 4], Rc<State>> = HashMap::new();
-        for (i, gen) in self.states.iter().enumerate() {
-            let tlen = cmp::min(self.len as usize - 1, enc.max_len) - i;
-            let mut appendable = enc.prefix_exact(&self.tokens[self.tokens.len() - tlen..]);
-            appendable.retain(|x| *x <= FREQ_THRESHOLD as u16);
-            for (key, state) in gen {
-                for x in &appendable {
-                    let mut nk = key.clone();
-                    nk[0] = *x;
-                    nk.rotate_left(1);
-
-                    let ns = Rc::new(State {
-                        total_len: self.len,
-                        total_p: state.total_p + p(dict, *x, key),
-                        len: tlen as u16,
-                        id: *x,
-                        parent: Some(state.clone())
-                    });
-                    new_states.entry(nk).and_modify(|s| if ns.total_p > s.total_p { *s = ns.clone() }).or_insert(ns); // the unnecessary clone is because Rust think `ns` is moved twice
-                }
+        if c == '\'' as u8 {
+            // prefix cannot extend across diaeresises, thus all generations before can be dropped
+            let last = self.states.last();
+            if let Some(last) = last {
+                let new_states = last.iter().map(|(k, s)| (k.clone(), Rc::new(State { total_len: s.total_len+1, ..<State as Clone>::clone(s) }))).collect(); // is the clone necessary? Not fully understand the Rust object spreading syntax.
+                self.states = vec![new_states];
+            } else { // it should not happen? empty states imply empty input, at which time the front-end will forward diaeresises as punctuations.
+                self.states = vec![];
             }
-        }
-        if self.len <= enc.max_len as u16 { // first several generations
-            for id in enc.prefix_exact(&self.tokens).into_iter().filter(|x| *x <= FREQ_THRESHOLD as u16) {
-                let ns = Rc::new(State {
-                    total_len: self.len,
-                    total_p: p(dict, id, &self.hist),
-                    len: self.len as u16,
-                    id: id,
-                    parent: None
-                });
-                let key = [self.hist[1],self.hist[2],self.hist[3],id]; // does Rust has a good way to express that?
-                new_states.entry(key).and_modify(|s| if ns.total_p > s.total_p { *s = ns.clone() }).or_insert(ns);
-            }
-        }
-
-        let mut new_states: Vec<_> = new_states.into_iter().collect();
-        new_states.sort_by(|(_, x), (_, y)| x.total_p.partial_cmp(&y.total_p).unwrap().reverse());
-        new_states.truncate(KEEP_N_BEST);
-
-        // 3. rotate generations
-        if self.states.len() == enc.max_len {
-            self.states[0] = new_states;
-            self.states.rotate_left(1);
         } else {
-            self.states.push(new_states);
+            let new_states = self.derive_new_generation(enc, dict);
+            rotate_insert(&mut self.states, enc.max_len, new_states)
         }
     }
 
@@ -113,6 +71,51 @@ impl SentenceModel for HMM {
     }
 }
 
+impl HMM {
+    fn derive_new_generation(&self, enc: &Encoding, dict: &Skip4) -> Vec<([u16; 4], Rc<State>)> {
+        let mut new_states: HashMap<[u16; 4], Rc<State>> = HashMap::new();
+        for (i, gen) in self.states.iter().rev().enumerate() {
+            let len = i + 1;
+            let mut appendable = enc.prefix_exact(&self.tokens[self.tokens.len() - len..]);
+            appendable.retain(|x| *x <= FREQ_THRESHOLD as u16);
+            for (key, state) in gen {
+                for x in &appendable {
+                    let mut nk = key.clone();
+                    nk[0] = *x;
+                    nk.rotate_left(1);
+
+                    let ns = Rc::new(State {
+                        total_len: self.len,
+                        total_p: state.total_p + p(dict, *x, key),
+                        len: len as u16,
+                        id: *x,
+                        parent: Some(state.clone())
+                    });
+                    new_states.entry(nk).and_modify(|s| if ns.total_p > s.total_p { *s = ns.clone() }).or_insert(ns); // the unnecessary clone is because Rust think `ns` is moved twice
+                }
+            }
+        }
+        if self.len <= enc.max_len as u16 { // first several generations // TODO: leading daeresis? It should not happend since the front-end will directly forward leading daeresises. remenber to also remove leading daeresises on candidate selection.
+            for id in enc.prefix_exact(&self.tokens).into_iter().filter(|x| *x <= FREQ_THRESHOLD as u16) {
+                let ns = Rc::new(State {
+                    total_len: self.len,
+                    total_p: p(dict, id, &self.hist),
+                    len: self.len as u16,
+                    id: id,
+                    parent: None
+                });
+                let key = [self.hist[1],self.hist[2],self.hist[3],id]; // does Rust has a good way to express that?
+                new_states.entry(key).and_modify(|s| if ns.total_p > s.total_p { *s = ns.clone() }).or_insert(ns);
+            }
+        }
+
+        let mut new_states: Vec<_> = new_states.into_iter().collect();
+        new_states.sort_by(|(_, x), (_, y)| x.total_p.partial_cmp(&y.total_p).unwrap().reverse());
+        new_states.truncate(KEEP_N_BEST);
+        new_states
+    }
+}
+
 #[derive(Clone, Default)]
 struct State {
     total_len: u16,
@@ -133,5 +136,14 @@ fn trace_sequence(s: &State) -> Vec<u16> {
         trace_sequence(p).apply_owned(|x| x.push(s.id))
     } else {
         vec![s.id]
+    }
+}
+
+fn rotate_insert<T>(vec: &mut Vec<T>, len: usize, new: T) {
+    if vec.len() == len {
+        vec[0] = new;
+        vec.rotate_left(1);
+    } else {
+        vec.push(new);
     }
 }

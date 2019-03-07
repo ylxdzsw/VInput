@@ -71,7 +71,7 @@ fn main() {
     let mut dirty = true; // indicate if buf changed and should update the candidates
     let mut hist: Vec<u8> = vec![0];
 
-    // for c in "kaka1".chars().map(|x| Some(Key::Char(x))) { //stdin().keys() {
+    // for c in "ka'ka1".chars().map(|x| Some(Key::Char(x))) { //stdin().keys() {
     for c in stdin().keys() {
         match c.unwrap() {
             Key::Char(c) => match c {
@@ -92,6 +92,12 @@ fn main() {
                         vip::set_hist(ctx, hist.as_ptr() as *const i8);
                         dirty = true
                     }
+                }
+                '\'' => if buf.is_empty() {
+                    send_raw(&dest, c)
+                } else {
+                    buf.push(c as u8);
+                    dirty = true
                 }
                 '\n' => if buf.is_empty() {
                     send_raw(&dest, c)

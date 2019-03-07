@@ -23,3 +23,4 @@ pub trait ApplyOwned: Sized {
 }
 
 impl<T: Sized> ApplyOwned for T {}
+

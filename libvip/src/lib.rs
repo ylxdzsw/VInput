@@ -49,7 +49,7 @@ pub extern fn free_candidates(candidates: *mut c_char) {
     unsafe { CString::from_raw(candidates) };
 }
 
-/// set the input sequence, the sequence should be a string terminated with \0 and contains only a-z in ASCII
+/// set the input sequence, the sequence should be a string terminated with \0 and contains only a-z or ' in ASCII
 /// successive calls will be optimized to use corresponding incremental method automatically (if possible)
 #[no_mangle]
 pub extern fn set_input(ctx: *mut Context, input: *const c_char) {
