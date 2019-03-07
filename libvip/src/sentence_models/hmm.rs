@@ -125,7 +125,7 @@ struct State {
 fn p(d: &Skip4, x: u16, h: &[u16; 4]) -> f32 {
     let (a1, a2, a3, a4) = (d[(h[3], x)][0].exp(), d[(h[2], x)][1].exp(), d[(h[1], x)][2].exp(), d[(h[0], x)][3].exp()); // Rust have no .map for arrays?
     // TODO: linear interpolation is bad. try something like softmax?
-    (0.6 * a1 + 0.2 * a2 + 0.1 * a3 + 0.1 * a4).ln()
+    (0.4 * a1 + 0.3 * a2 + 0.2 * a3 + 0.1 * a4).ln()
 }
 
 fn trace_sequence(s: &State) -> Vec<u16> {

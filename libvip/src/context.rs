@@ -32,6 +32,7 @@ impl<SM: SentenceModel, WM: WordModel> Context<SM, WM> {
 
     pub fn get_candidates(&mut self) -> Vec<(usize, String)> {
         // TODO: keep only the one consuming most tokens for each candidate
+        // TODO: remove duplication, like when sentence have only one char
         let sentence = self.sm.as_ref().and_then(|x| x.get_sentence(&self.enc, &self.smdata));
         let mut all = if let Some(sentence) = sentence {
             vec![(self.input.len(), sentence.iter().map(|x| self.enc.id[*x as usize - 1]).collect())]

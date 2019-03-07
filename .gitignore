@@ -7,7 +7,6 @@ node_modules
 !/libvip/data/parse_tg_data.jl
 !/libvip/data/parse_encoding.jl
 !/libvip/data/readme.txt
-!/libvip/data/raw/unicode.txt
 vscode-extension/out
 *.vsix
 package-lock.json
