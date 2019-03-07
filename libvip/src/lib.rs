@@ -51,6 +51,7 @@ pub extern fn free_candidates(candidates: *mut c_char) {
 
 /// set the input sequence, the sequence should be a string terminated with \0 and contains only a-z or ' in ASCII
 /// successive calls will be optimized to use corresponding incremental method automatically (if possible)
+/// there should be no leading or sucessive diaeresises `'`. Note: remember removing leading ones caused by selecting a candidate
 #[no_mangle]
 pub extern fn set_input(ctx: *mut Context, input: *const c_char) {
     let ctx = unsafe { &mut *ctx };

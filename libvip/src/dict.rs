@@ -118,11 +118,6 @@ impl Encoding {
         sort_and_dedup(self.map.range(x.to_vec()..up).map(|(_k, v)| v.clone()).flatten().collect())
     }
 
-    pub fn exact_prefix(&self, x: &[u8]) -> Vec<(usize, u16)> {
-        let len = cmp::min(x.len(), self.max_len);
-        sort_and_dedup((0..len).map(|i| self.exact_exact(&x[..=i]).iter().map(|x| (i, *x)).collect::<Vec<_>>()).flatten().collect())
-    }
-
     pub fn prefix_prefix(&self, x: &[u8]) -> Vec<(usize, u16)> { // TODO: too many? performance?
         let len = cmp::min(x.len(), self.max_len);
         sort_and_dedup((0..len).map(|i| self.prefix_exact(&x[..=i]).iter().map(|x| (i+1, *x)).collect::<Vec<_>>()).flatten().collect())

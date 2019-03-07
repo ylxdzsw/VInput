@@ -88,6 +88,9 @@ fn main() {
                     } else if let Some((len, x)) = candidate.get(10 * page + i - 1) {
                         send(&dest, x);
                         buf.drain(0..*len);
+                        if buf.len() > 0 && buf[0] == '\'' as u8 {
+                            buf.remove(0); // ensure no leading diaeresis after selection
+                        }
                         append_hist(&mut hist, x.as_bytes());
                         vip::set_hist(ctx, hist.as_ptr() as *const i8);
                         dirty = true
@@ -160,7 +163,7 @@ fn render(io: &mut Write, buf: &[char], menu: &[(usize, String)]) {
     write!(io, "{}\r{}", cursor::Up(1+menu.len() as u16), cursor::Right(1+buf.len() as u16)).unwrap();
 }
 
-fn append_hist(hist: &mut Vec<u8>, new: &[u8]) {
+fn append_hist(hist: &mut Vec<u8>, new: &[u8]) { // ensure terminating zero
     hist.pop();
     for c in new {
         hist.push(*c)
