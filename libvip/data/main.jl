@@ -20,6 +20,7 @@ function emurate_corpus(id_map, files...)
     unigram, skips = fill(0, N+1), ntuple(x->fill(0, N+1, N+1), Nskip)
     for file in files, line in eachline(file)
         i = findfirst(x->x==' ', line)
+        i == nothing && continue # todo: remove these at first place
         w = parse(Int, line[1:i-1])
         r = collect(line[i+1:end])
 
@@ -49,7 +50,8 @@ function emurate_corpus(id_map, files...)
 end
 
 encoding = "data/raw/pinyin.txt"
-corpus = ("data/raw/corpus_1", "data/raw/corpus_2", "data/raw/corpus_3", "data/raw/corpus_4")
+corpus = ("data/raw/corpus_1", "data/raw/corpus_2", "data/raw/corpus_3", "data/raw/corpus_4",
+          "data/raw/corpus_5", "data/raw/corpus_6", "data/raw/corpus_7", "data/raw/corpus_8")
 
 t_id = parse_encoding(encoding)
 t_map = Dict(c=>i for (i, c) in enumerate(t_id))

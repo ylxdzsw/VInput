@@ -37,9 +37,11 @@ for line in eachline("data/raw/pinyin.raw")
 end
 
 # may kill it before actually finished
-const corpus = ("data/raw/corpus_1", "data/raw/corpus_2", "data/raw/corpus_3", "data/raw/corpus_4")
-for file in reverse(corpus), line in eachline(file)
+const corpus = ("data/raw/corpus_1", "data/raw/corpus_2", "data/raw/corpus_3", "data/raw/corpus_4",
+                "data/raw/corpus_5", "data/raw/corpus_6", "data/raw/corpus_7", "data/raw/corpus_8")
+for file in corpus, line in eachline(file)
     i = findfirst(x->x==' ', line)
+    i == nothing && continue # this should not happen but it does happen in current data
     w = parse(Int, line[1:i-1])
     for c in line[i+1:end]
         if c in keys(freq)
