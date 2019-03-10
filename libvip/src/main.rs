@@ -71,7 +71,7 @@ fn main() {
     let mut dirty = true; // indicate if buf changed and should update the candidates
     let mut hist: Vec<u8> = vec![0];
 
-    // for c in "ka'ka1".chars().map(|x| Some(Key::Char(x))) { //stdin().keys() {
+    // for c in "ka'ka1".chars().map(|x| Some(Key::Char(x))) {
     for c in stdin().keys() {
         match c.unwrap() {
             Key::Char(c) => match c {
