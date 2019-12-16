@@ -1,7 +1,7 @@
 VInput
 ======
 
-A experimental new Chinese input method.
+A experimental new Chinese input method. (not done yet)
 
 #### open source & corss platform
 
